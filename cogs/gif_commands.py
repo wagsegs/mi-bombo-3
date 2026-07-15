@@ -1,3 +1,5 @@
+import discord
+
 from utils.cooldowns import get_remaining, set_cooldown
 from discord.ext import commands
 
@@ -51,6 +53,29 @@ CAPTIONS = {
     "villainarc": "has started a villain arc.",
     "aura": "has gained aura.",
     "huh": "is confused."
+}
+
+HELP_DESCRIPTIONS = {
+    "rizz": "Sends a rizz-style reaction",
+    "larp": "Triggers full roleplay energy",
+    "jojos": "Brings dramatic anime vibes",
+    "blush": "Shows a shy anime moment",
+    "ohio": "Plays the Ohio meme energy",
+    "cooked": "Sends a cooked meme reaction",
+    "fumble": "Shows a classic fumble moment",
+    "isekai": "Starts an isekai-style scene",
+    "stare": "Adds a strong anime stare",
+    "cope": "Shows a coping meme",
+    "based": "Drops a based reaction",
+    "skillissue": "Calls out a skill issue",
+    "touchgrass": "Orders someone to touch grass",
+    "caught": "Catches someone in 4K",
+    "letmecook": "Lets the cooking meme begin",
+    "fraudwatch": "Puts someone under fraud watch",
+    "canon": "Creates a canon event moment",
+    "villainarc": "Starts a villain arc",
+    "aura": "Adds a powerful aura vibe",
+    "huh": "Sends a confused reaction"
 }
 
 
@@ -151,20 +176,29 @@ def create_command(command_name):
 def create_help_command():
 
     async def help_command(ctx):
-        command_lines = "\n".join(
-            f"{PREFIX}{name} - {description}"
-            for name, description in COMMANDS.items()
+        embed = discord.Embed(
+            title="🤖 Mi Bombo Commands",
+            description="Use these commands in chat.",
+            color=0x9b5de5
         )
+        embed.set_footer(text=f"Prefix: {PREFIX}")
 
-        await ctx.send(
-            f"🤖 Available commands:\n{command_lines}"
-        )
+        for command_name in COMMANDS:
+            description = HELP_DESCRIPTIONS.get(command_name, "Funny reaction command")
+            embed.add_field(
+                name=f"`{PREFIX}{command_name}`",
+                value=description,
+                inline=True
+            )
 
-    help_command.__name__ = "commands"
+        await ctx.send(embed=embed)
+
+    help_command.__name__ = "help"
 
     return commands.Command(
         help_command,
-        name="commands"
+        name="help",
+        aliases=["commands"]
     )
 
 
