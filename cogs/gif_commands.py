@@ -160,11 +160,11 @@ def create_help_command():
             f"🤖 Available commands:\n{command_lines}"
         )
 
-    help_command.__name__ = "help"
+    help_command.__name__ = "commands"
 
     return commands.Command(
         help_command,
-        name="help"
+        name="commands"
     )
 
 
