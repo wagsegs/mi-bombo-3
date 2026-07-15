@@ -1,0 +1,416 @@
+Copy this into the next chat:
+
+```text
+# MI BOM3O Discord Bot Progress Summary
+
+Date: 2026-07-15
+
+## Project Goal
+
+Building a Discord bot for the MI BOM3O server.
+
+The bot's purpose:
+- Turn normal Discord conversations into funny "events"
+- Use GIF reactions for commands
+- Have a chaotic internet/anime/meme personality
+- Eventually expand into server lore, memories, and community features
+
+---
+
+# Current Bot Status
+
+The bot is ONLINE and working.
+
+Built using:
+
+- Python
+- discord.py
+- VS Code
+- dotenv
+- aiohttp
+
+---
+
+# Current Folder Structure
+
+```
+
+mi bombo/
+
+├── bot.py
+├── config.py
+├── .env
+├── requirements.txt
+│
+├── cogs/
+│   └── gif_commands.py
+│
+└── utils/
+├── gif_api.py
+├── embeds.py
+└── cooldowns.py
+
+```
+
+---
+
+# Setup Completed
+
+## requirements.txt
+
+Installed:
+
+```
+
+discord.py
+python-dotenv
+aiohttp
+
+```
+
+---
+
+# Bot Foundation
+
+## bot.py
+
+Working:
+
+- Discord connection
+- Prefix commands
+- Intents enabled:
+  - message_content
+  - members
+  - guilds
+
+Prefix:
+
+```
+
+.
+
+```
+
+Example:
+
+```
+
+.rizz
+
+```
+
+---
+
+# Config System
+
+## .env
+
+Contains:
+
+```
+
+DISCORD_TOKEN=
+PREFIX=.
+KLIPY_URL=
+KLIPY_KEY=
+
+```
+
+Note:
+The Klipy API key was exposed during testing and should be regenerated.
+
+---
+
+# Cog System
+
+Implemented:
+
+```
+
+cogs/gif_commands.py
+
+```
+
+Bot loads cogs automatically.
+
+Current startup:
+
+```
+
+✓ Loaded cogs.gif_commands
+🤖 MI BOM3O is online!
+
+```
+
+---
+
+# GIF API System
+
+Using Klipy:
+
+Endpoint:
+
+```
+
+[https://api.klipy.com/v2/search](https://api.klipy.com/v2/search)
+
+```
+
+Correct response parsing:
+
+```
+
+payload["results"]
+
+item["media_formats"]["gif"]["url"]
+
+```
+
+Created:
+
+```
+
+utils/gif_api.py
+
+```
+
+Function:
+
+```
+
+fetch_gif(query)
+
+```
+
+It:
+- sends async request
+- gets GIF results
+- randomly chooses a GIF
+- returns URL
+
+---
+
+# Embed System
+
+Created:
+
+```
+
+utils/embeds.py
+
+```
+
+Features:
+
+- random embed colors
+- GIF image
+- footer:
+
+```
+
+🤖 MI BOM3O
+
+```
+
+---
+
+# Commands Added
+
+All 20 commands:
+
+```
+
+.rizz
+.larp
+.jojos
+.blush
+.ohio
+.cooked
+.fumble
+.isekai
+.stare
+.cope
+.based
+.skillissue
+.touchgrass
+.caught
+.letmecook
+.fraudwatch
+.canon
+.villainarc
+.aura
+.huh
+
+```
+
+---
+
+# Command Behavior
+
+Examples:
+
+```
+
+.rizz
+
+```
+
+Targets yourself.
+
+```
+
+.rizz @someone
+
+```
+
+Targets someone else.
+
+Multiple targets:
+
+```
+
+.rizz @A @B @C @D
+
+```
+
+Maximum:
+
+```
+
+4 users
+
+```
+
+---
+
+# Current Command Output
+
+Example:
+
+```
+
+✨ RIZZ ✨
+
+@User has activated the rizz technique.
+
+[GIF]
+
+🤖 MI BOM3O
+
+```
+
+---
+
+# Cooldown System
+
+Created:
+
+```
+
+utils/cooldowns.py
+
+```
+
+Implemented:
+
+## Normal command cooldown
+
+Examples:
+
+```
+
+.rizz
+.rizz @someone
+
+```
+
+Cooldown:
+
+```
+
+3 seconds
+
+```
+
+---
+
+## Multi-target cooldown
+
+Example:
+
+```
+
+.rizz @A @B @C
+
+```
+
+Cooldown:
+
+```
+
+10 minutes
+
+```
+
+---
+
+# Not Finished Yet
+
+## Role cooldown bypass
+
+Need to add:
+
+Roles:
+
+```
+
+Main Character
+Main Cast
+
+```
+
+Behavior:
+
+Multi-target cooldown:
+
+Normal:
+
+```
+
+10 minutes
+
+```
+
+With either role:
+
+```
+
+2 minutes
+
+```
+
+---
+
+# Future Improvements
+
+Possible next steps:
+
+1. Improve command captions to feel more MI BOM3O
+2. Add GIF history so the same GIF doesn't repeat
+3. Better error messages
+4. Add more personality
+5. Add lore/memory systems
+6. Add bot statistics
+7. Add Hall of Fame features
+8. Add server event systems
+
+---
+
+# Important
+
+Current bot is already functional.
+
+The next conversation should continue from:
+
+"MI BOM3O bot has working GIF commands, need to finish role cooldown bypass and polish."
+```
