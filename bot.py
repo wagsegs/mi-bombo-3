@@ -18,7 +18,8 @@ intents.guilds = True
 
 bot = commands.Bot(
     command_prefix=PREFIX,
-    intents=intents
+    intents=intents,
+    help_command=None
 )
 
 

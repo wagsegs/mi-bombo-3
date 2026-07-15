@@ -197,8 +197,7 @@ def create_help_command():
 
     return commands.Command(
         help_command,
-        name="commands",
-        aliases=["commands"]
+        name="commands"
     )
 
 
@@ -208,6 +207,7 @@ async def setup(bot):
 
     await bot.add_cog(cog)
 
+    bot.remove_command("help")
     bot.add_command(create_help_command())
 
     for command_name in COMMANDS:
