@@ -1,6 +1,7 @@
 from utils.cooldowns import get_remaining, set_cooldown
 from discord.ext import commands
 
+from config import PREFIX
 from utils.gif_api import fetch_gif
 from utils.embeds import create_gif_embed
 
@@ -147,11 +148,33 @@ def create_command(command_name):
     )
 
 
+def create_help_command():
+
+    async def help_command(ctx):
+        command_lines = "\n".join(
+            f"{PREFIX}{name} - {description}"
+            for name, description in COMMANDS.items()
+        )
+
+        await ctx.send(
+            f"🤖 Available commands:\n{command_lines}"
+        )
+
+    help_command.__name__ = "help"
+
+    return commands.Command(
+        help_command,
+        name="help"
+    )
+
+
 async def setup(bot):
 
     cog = GifCommands(bot)
 
     await bot.add_cog(cog)
+
+    bot.add_command(create_help_command())
 
     for command_name in COMMANDS:
         bot.add_command(
