@@ -193,11 +193,11 @@ def create_help_command():
 
         await ctx.send(embed=embed)
 
-    help_command.__name__ = "help"
+    help_command.__name__ = "commands"
 
     return commands.Command(
         help_command,
-        name="help",
+        name="commands",
         aliases=["commands"]
     )
 
