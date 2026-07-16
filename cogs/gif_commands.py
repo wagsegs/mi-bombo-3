@@ -30,6 +30,49 @@ def extract_custom_query(content, prefix="."):
     return query or None
 
 
+def build_custom_gif_details(ctx, prefix="."):
+    original_content = getattr(ctx.message, "content", "") or ""
+    mentions = list(getattr(ctx.message, "mentions", []) or [])
+
+    query = extract_custom_query(original_content, prefix)
+
+    if not query:
+        return None, None
+
+    cleaned_query = query
+
+    for mention in mentions:
+        mention_text = getattr(mention, "mention", None)
+
+        if mention_text:
+            cleaned_query = cleaned_query.replace(mention_text, " ")
+
+    cleaned_query = " ".join(cleaned_query.split())
+
+    if not cleaned_query:
+        return None, None
+
+    targets = " ".join(
+        getattr(mention, "mention", "") for mention in mentions if getattr(mention, "mention", None)
+    )
+
+    if targets:
+        target_label = "Target:" if len(mentions) == 1 else "Targets:"
+        target_section = f"{target_label}\n{targets}"
+    else:
+        target_section = None
+
+    description_parts = [f"Requested by {ctx.author.mention}"]
+
+    if target_section:
+        description_parts.append("")
+        description_parts.append(target_section)
+
+    description_parts.extend(["", "Query:", f"`{cleaned_query}`"])
+
+    return cleaned_query, "\n".join(description_parts)
+
+
 COMMANDS = {
     "rizz": "rizz",
     "larp": "larp",
@@ -186,12 +229,9 @@ async def run_custom_action(ctx):
         )
         return
 
-    query = extract_custom_query(
-        ctx.message.content,
-        PREFIX
-    )
+    query, description = build_custom_gif_details(ctx, PREFIX)
 
-    if not query:
+    if not query or not description:
         await ctx.send(
             "Please provide something to search for.\n\nExample:\n.c door shutting"
         )
@@ -207,11 +247,6 @@ async def run_custom_action(ctx):
             f"Couldn't find any GIFs for:\n{query}"
         )
         return
-
-    description = (
-        f"Requested by {ctx.author.mention}\n\n"
-        f"Query:\n`{query}`"
-    )
 
     embed = create_gif_embed(
         "🎬 Custom GIF",
