@@ -22,7 +22,7 @@ def create_gif_embed(title, description, gif_url):
     embed.set_image(url=gif_url)
 
     embed.set_footer(
-        text="holy moly"
+        text="🤖 MI BOM3O"
     )
 
     return embed

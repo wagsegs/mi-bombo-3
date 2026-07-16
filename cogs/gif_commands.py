@@ -8,6 +8,28 @@ from utils.gif_api import fetch_gif
 from utils.embeds import create_gif_embed
 
 
+def extract_custom_query(content, prefix="."):
+    if not content:
+        return None
+
+    stripped = content.strip()
+
+    if not stripped.startswith(prefix):
+        return None
+
+    without_prefix = stripped[len(prefix):].strip()
+
+    if not without_prefix:
+        return None
+
+    if not without_prefix.startswith("c"):
+        return None
+
+    query = without_prefix[1:].strip()
+
+    return query or None
+
+
 COMMANDS = {
     "rizz": "rizz",
     "larp": "larp",
@@ -84,6 +106,39 @@ class GifCommands(commands.Cog):
         self.bot = bot
 
 
+async def _apply_cooldown(ctx, cooldown_time=None):
+    remaining = get_remaining(ctx.author.id)
+
+    if remaining > 0:
+        await ctx.send(
+            f"⏳ Post nut clarity is here. Try again in {remaining}s."
+        )
+        return False
+
+    if cooldown_time is None:
+        mentions = ctx.message.mentions
+
+        if len(mentions) >= 2:
+            cooldown_time = 600  # 10 minutes
+
+            roles = [
+                role.name.lower()
+                for role in ctx.author.roles
+            ]
+
+            if (
+                "main character" in roles
+                or "main cast" in roles
+            ):
+                cooldown_time = 120  # 2 minutes
+
+        else:
+            cooldown_time = 3
+
+    set_cooldown(ctx.author.id, cooldown_time)
+    return True
+
+
 async def run_action(ctx, command_name):
     mentions = ctx.message.mentions
 
@@ -93,41 +148,8 @@ async def run_action(ctx, command_name):
         )
         return
 
-
-    # Cooldown check
-    remaining = get_remaining(ctx.author.id)
-
-    if remaining > 0:
-        await ctx.send(
-            f"⏳ Post nut clarity is here. Try again in {remaining}s."
-        )
+    if not await _apply_cooldown(ctx):
         return
-
-
-    # Determine cooldown length
-    if len(mentions) >= 2:
-        cooldown_time = 600  # 10 minutes
-
-        roles = [
-            role.name.lower()
-            for role in ctx.author.roles
-        ]
-
-        if (
-            "main character" in roles
-            or "main cast" in roles
-        ):
-            cooldown_time = 120  # 2 minutes
-
-    else:
-        cooldown_time = 3
-
-
-    set_cooldown(
-        ctx.author.id,
-        cooldown_time
-    )
-
 
     if mentions:
         targets = " ".join(
@@ -135,7 +157,6 @@ async def run_action(ctx, command_name):
         )
     else:
         targets = ctx.author.mention
-
 
     gif = await fetch_gif(
         COMMANDS[command_name]
@@ -147,10 +168,54 @@ async def run_action(ctx, command_name):
         )
         return
 
-
     embed = create_gif_embed(
         f"✨ {command_name.upper()} ✨",
         f"{targets} {CAPTIONS[command_name]}",
+        gif
+    )
+
+    await ctx.send(embed=embed)
+
+
+async def run_custom_action(ctx):
+    mentions = ctx.message.mentions
+
+    if len(mentions) > 4:
+        await ctx.send(
+            "❌ Maximum 4 users can be targeted."
+        )
+        return
+
+    query = extract_custom_query(
+        ctx.message.content,
+        PREFIX
+    )
+
+    if not query:
+        await ctx.send(
+            "Please provide something to search for.\n\nExample:\n.c door shutting"
+        )
+        return
+
+    if not await _apply_cooldown(ctx, 3):
+        return
+
+    gif = await fetch_gif(query)
+
+    if not gif:
+        await ctx.send(
+            f"Couldn't find any GIFs for:\n{query}"
+        )
+        return
+
+    description = (
+        f"Requested by {ctx.author.mention}\n\n"
+        f"Query:\n`{query}`"
+    )
+
+    embed = create_gif_embed(
+        "🎬 Custom GIF",
+        description,
         gif
     )
 
@@ -173,11 +238,32 @@ def create_command(command_name):
     )
 
 
+def create_custom_command():
+
+    async def custom_command(ctx, *args):
+        query = " ".join(args)
+
+        if not query:
+            await ctx.send(
+                "Please provide something to search for.\n\nExample:\n.c door shutting"
+            )
+            return
+
+        await run_custom_action(ctx)
+
+    custom_command.__name__ = "c"
+
+    return commands.Command(
+        custom_command,
+        name="c"
+    )
+
+
 def create_help_command():
 
     async def help_command(ctx):
         embed = discord.Embed(
-            title="🤖 Mi Bombo Commands",
+            title="bomboclat commands",
             description="Use these commands in chat.",
             color=0x9b5de5
         )
@@ -190,6 +276,12 @@ def create_help_command():
                 value=description,
                 inline=True
             )
+
+        embed.add_field(
+            name=f"`{PREFIX}c`",
+            value="Searches Klipy for any GIF you want",
+            inline=True
+        )
 
         await ctx.send(embed=embed)
 
@@ -209,6 +301,7 @@ async def setup(bot):
 
     bot.remove_command("help")
     bot.add_command(create_help_command())
+    bot.add_command(create_custom_command())
 
     for command_name in COMMANDS:
         bot.add_command(
