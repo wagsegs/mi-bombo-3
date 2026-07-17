@@ -56,21 +56,12 @@ def build_custom_gif_details(ctx, prefix="."):
         getattr(mention, "mention", "") for mention in mentions if getattr(mention, "mention", None)
     )
 
+    description_parts = [ctx.author.mention, f'"{cleaned_query}"']
+
     if targets:
-        target_label = "Target:" if len(mentions) == 1 else "Targets:"
-        target_section = f"{target_label}\n{targets}"
-    else:
-        target_section = None
+        description_parts.append(targets)
 
-    description_parts = [f"Requested by {ctx.author.mention}"]
-
-    if target_section:
-        description_parts.append("")
-        description_parts.append(target_section)
-
-    description_parts.extend(["", "Query:", f"`{cleaned_query}`"])
-
-    return cleaned_query, "\n".join(description_parts)
+    return cleaned_query, " ".join(description_parts)
 
 
 COMMANDS = {

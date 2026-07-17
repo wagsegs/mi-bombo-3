@@ -34,6 +34,4 @@ def test_build_custom_gif_details_strips_mentions_from_query():
     query, description = build_custom_gif_details(ctx, ".")
 
     assert query == "calculus"
-    assert "Target:" in description
-    assert "<@1320436656263921782>" in description
-    assert "Query:" in description
+    assert description == '@User "calculus" <@1320436656263921782>'
