@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from cogs.welcome import build_welcome_embed
+from config import WELCOME_GIFS, WELCOME_MESSAGES
 
 
 def test_build_welcome_embed_uses_configured_values():
@@ -33,3 +34,9 @@ def test_build_welcome_embed_returns_none_for_empty_lists():
     assert (
         build_welcome_embed(member, [], [], 0x123456, "Footer") is None
     )
+
+
+def test_welcome_content_is_loaded_from_assets():
+    assert WELCOME_MESSAGES
+    assert WELCOME_GIFS
+    assert any("{member}" in message for message in WELCOME_MESSAGES)
