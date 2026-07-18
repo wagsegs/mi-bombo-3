@@ -54,7 +54,7 @@ You're here because you're part of the cast now.
 • Don't trash the set.
 • Don't make the crew clean up your mess.
 
-> **Director:** If I yell **"CUT!"**, that's the end of the scene.
+If I yell **"CUT!"**, that's the end of the scene.
 
 ### 🎥 EVERYTHING ELSE
 
@@ -63,11 +63,42 @@ You're here because you're part of the cast now.
 • Don't make me rewrite the script.
 • Give the audience a show worth watching.
 
-━━━━━━━━━━━━━━━━━━
+🔥 ───────────────────────────────────────────── 🔥
 
-# 🎬 LIGHTS!
+**🎬 KNOW YOUR SET**
 
-# 🎥 CAMERA!!
+**#casting**  
+This is where promotions happen. Impress the Director and you'll work your way from **Extra** to **Main Cast**.
+
+**#bombo-times**  
+If you make today's headlines... you either cooked or completely crashed out.
+
+**#best-takes**  
+The moments worth replaying. Absolute Cinema.
+
+**#stage-floor**  
+The main set. Most of the stuff happens here.
+
+**#dear-basketball**  
+basically dear diary.
+
+**#communal-shower**  
+Keep it clean.  
+...Mentally, preferably.
+
+**#hidden-quests**  
+If you found this channel, congratulations.  
+
+**#private-island**  
+VIP access.  
+If you're not here, work harder.  
+Or bribe the producer.
+
+🔥 ───────────────────────────────────────────── 🔥
+
+### 🎬 LIGHTS!
+
+## 🎥 CAMERA!!
 
 # 🗣️ **LET'S FUCKING GO!!!**
 """,
