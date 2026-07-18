@@ -41,7 +41,8 @@ WELCOME_GIFS = _load_asset_lines("welcome_gifs.txt") or [
 DIRECTORS_TITLE = os.getenv("DIRECTORS_TITLE", "🎬 DIRECTOR'S NOTES")
 DIRECTORS_DESCRIPTION = os.getenv(
     "DIRECTORS_DESCRIPTION",
-    "# 🎬 QUIET ON SET!
+    """
+# 🎬 QUIET ON SET!
 
 Alright, listen up.
 
@@ -68,7 +69,8 @@ You're here because you're part of the cast now.
 
 # 🎥 CAMERA!!
 
-# 🍿 **LET'S FUCKING GO!!!**",
+# 🗣️ **LET'S FUCKING GO!!!**
+""",
 )
 DIRECTORS_FOOTER = os.getenv("DIRECTORS_FOOTER", "MI BOMBO Studios")
 DIRECTORS_COLOR = int(os.getenv("DIRECTORS_COLOR", "0x7B61FF"), 16)
