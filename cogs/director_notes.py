@@ -76,18 +76,18 @@ class DirectorNotesCog(commands.Cog):
             return False
 
     def _build_embed(self, ctx):
-    embed = discord.Embed(
-        title=DIRECTORS_TITLE,
-        description=f"```text\n{DIRECTORS_DESCRIPTION}\n```",
-        color=DIRECTORS_COLOR,
-    )
+        embed = discord.Embed(
+            title=DIRECTORS_TITLE,
+            description=f"```text\n{DIRECTORS_DESCRIPTION}\n```",
+            color=DIRECTORS_COLOR,
+        )
 
-    # ADD THIS
-    media_path = Path(DIRECTORS_MEDIA)
-    embed.set_image(url=f"attachment://{media_path.name}")
+        # ADD THIS
+        media_path = Path(DIRECTORS_MEDIA)
+        embed.set_image(url=f"attachment://{media_path.name}")
 
-    embed.set_footer(text=DIRECTORS_FOOTER)
-    return embed
+        embed.set_footer(text=DIRECTORS_FOOTER)
+        return embed
 
 
 async def setup(bot):
