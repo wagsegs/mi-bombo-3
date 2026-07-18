@@ -78,7 +78,7 @@ class DirectorNotesCog(commands.Cog):
     def _build_embed(self, ctx):
         embed = discord.Embed(
             title=DIRECTORS_TITLE,
-            description=f"```text\n{DIRECTORS_DESCRIPTION}\n```",
+            description=DIRECTORS_DESCRIPTION,
             color=DIRECTORS_COLOR,
         )
 

@@ -41,7 +41,34 @@ WELCOME_GIFS = _load_asset_lines("welcome_gifs.txt") or [
 DIRECTORS_TITLE = os.getenv("DIRECTORS_TITLE", "🎬 DIRECTOR'S NOTES")
 DIRECTORS_DESCRIPTION = os.getenv(
     "DIRECTORS_DESCRIPTION",
-    "QUIET ON SET!\n\nAlright, listen up.\n\nYou're here because you're part of the cast now.\n\nStay in character.\nRespect the people you're filming with.\nDon't trash the set.\nDon't make the crew clean up your mess.\n\nIf the Director yells \"CUT!\"\n...that's the end of the scene.\n\nEverything else?\n\nDo your thing.\nKeep the production rolling.\nDon't make me rewrite the script.\nGive the audience a show worth watching.\n\n...\n\nAlright.\n\nLIGHTS!\n\nCAMERA!!\n\nLET'S FUCKING GO!!!",
+    "# 🎬 QUIET ON SET!
+
+Alright, listen up.
+
+You're here because you're part of the cast now.
+
+### 🎭 STAY IN CHARACTER
+
+• Respect the people you're filming with.
+• Don't trash the set.
+• Don't make the crew clean up your mess.
+
+> **Director:** If I yell **"CUT!"**, that's the end of the scene.
+
+### 🎥 EVERYTHING ELSE
+
+• Do your thing.
+• Keep the production rolling.
+• Don't make me rewrite the script.
+• Give the audience a show worth watching.
+
+━━━━━━━━━━━━━━━━━━
+
+# 🎬 LIGHTS!
+
+# 🎥 CAMERA!!
+
+# 🍿 **LET'S FUCKING GO!!!**",
 )
 DIRECTORS_FOOTER = os.getenv("DIRECTORS_FOOTER", "MI BOMBO Studios")
 DIRECTORS_COLOR = int(os.getenv("DIRECTORS_COLOR", "0x7B61FF"), 16)
