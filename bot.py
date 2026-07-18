@@ -7,7 +7,8 @@ from discord.ext import commands
 from config import PREFIX, DISCORD_TOKEN
 
 COGS = [
-    "cogs.gif_commands"
+    "cogs.gif_commands",
+    "cogs.welcome"
 ]
 
 intents = discord.Intents.default()
