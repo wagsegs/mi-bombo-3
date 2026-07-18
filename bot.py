@@ -8,7 +8,8 @@ from config import PREFIX, DISCORD_TOKEN
 
 COGS = [
     "cogs.gif_commands",
-    "cogs.welcome"
+    "cogs.welcome",
+    "cogs.director_notes"
 ]
 
 intents = discord.Intents.default()

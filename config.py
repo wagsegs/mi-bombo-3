@@ -37,3 +37,12 @@ WELCOME_MESSAGES = _load_asset_lines("welcome_messages.txt") or [
 WELCOME_GIFS = _load_asset_lines("welcome_gifs.txt") or [
     "https://media.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif",
 ]
+
+DIRECTORS_TITLE = os.getenv("DIRECTORS_TITLE", "🎬 DIRECTOR'S NOTES")
+DIRECTORS_DESCRIPTION = os.getenv(
+    "DIRECTORS_DESCRIPTION",
+    "QUIET ON SET!\n\nAlright, listen up.\n\nYou're here because you're part of the cast now.\n\nStay in character.\nRespect the people you're filming with.\nDon't trash the set.\nDon't make the crew clean up your mess.\n\nIf the Director yells \"CUT!\"\n...that's the end of the scene.\n\nEverything else?\n\nDo your thing.\nKeep the production rolling.\nDon't make me rewrite the script.\nGive the audience a show worth watching.\n\n...\n\nAlright.\n\nLIGHTS!\n\nCAMERA!!\n\nLET'S FUCKING GO!!!",
+)
+DIRECTORS_FOOTER = os.getenv("DIRECTORS_FOOTER", "MI BOMBO Studios")
+DIRECTORS_COLOR = int(os.getenv("DIRECTORS_COLOR", "0x7B61FF"), 16)
+DIRECTORS_MEDIA = os.getenv("DIRECTORS_MEDIA", str(BASE_DIR / "lesgo.gif"))
