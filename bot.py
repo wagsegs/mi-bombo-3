@@ -4,7 +4,7 @@ import logging
 import discord
 from discord.ext import commands
 
-from config import PREFIX, DISCORD_TOKEN, DATABASE_URL, GEMINI_API_KEY
+from config import PREFIX, STUDIO_PREFIX, DISCORD_TOKEN, DATABASE_URL, GEMINI_API_KEY
 
 import database
 from ai import gemini
@@ -15,6 +15,7 @@ COGS = [
     "cogs.welcome",
     "cogs.director_notes",
     "cogs.message_listener",
+    "cogs.studio_management",
     "progression",
 ]
 
@@ -25,9 +26,9 @@ intents.guilds = True
 
 
 bot = commands.Bot(
-    command_prefix=PREFIX,
+    command_prefix=commands.when_mentioned_or(PREFIX, STUDIO_PREFIX),
     intents=intents,
-    help_command=None
+    help_command=None,
 )
 
 

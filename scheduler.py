@@ -10,6 +10,7 @@ import pytz
 import database
 from ai import gemini
 from config import (
+    MANUAL_STUDIO_MODE,
     SCHEDULER_TIMEZONE,
     NEWSPAPER_SCHEDULE,
     WEEKLY_CAST_SCHEDULE,
@@ -59,6 +60,9 @@ async def schedule_newspaper() -> None:
     """Schedule daily newspaper job."""
     if not _scheduler:
         return
+    if MANUAL_STUDIO_MODE:
+        logger.info("🛠️ Manual Studio mode enabled; automatic newspaper scheduling is disabled")
+        return
 
     # Parse schedule (format: "HH:MM")
     hour, minute = map(int, NEWSPAPER_SCHEDULE.split(":"))
@@ -77,6 +81,9 @@ async def schedule_weekly_cast() -> None:
     """Schedule weekly cast job (Sundays)."""
     if not _scheduler:
         return
+    if MANUAL_STUDIO_MODE:
+        logger.info("🛠️ Manual Studio mode enabled; automatic weekly cast scheduling is disabled")
+        return
 
     # Parse schedule (format: "HH:MM")
     hour, minute = map(int, WEEKLY_CAST_SCHEDULE.split(":"))
@@ -93,6 +100,9 @@ async def schedule_weekly_cast() -> None:
 
 async def _job_newspaper() -> None:
     """Daily newspaper job."""
+    if MANUAL_STUDIO_MODE:
+        logger.info("🛠️ Manual Studio mode enabled; newspaper job skipped")
+        return
     try:
         logger.info("📰 Starting daily newspaper generation...")
 
@@ -180,6 +190,9 @@ async def _job_newspaper() -> None:
 
 async def _job_weekly_cast() -> None:
     """Weekly cast job."""
+    if MANUAL_STUDIO_MODE:
+        logger.info("🛠️ Manual Studio mode enabled; weekly cast job skipped")
+        return
     try:
         logger.info("🎭 Starting weekly cast generation...")
 

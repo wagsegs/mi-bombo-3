@@ -87,6 +87,61 @@ def future_reaction_bonus() -> int:
     return 0
 
 
+def get_role_name(role_id: Optional[int], guild: Optional[discord.Guild]) -> str:
+    """Return a role name for display, falling back to a cinematic label."""
+    if not role_id or not guild:
+        return "Rising Talent"
+    role = guild.get_role(role_id)
+    return role.name if role else "Rising Talent"
+
+
+def get_rank_name(role_id: Optional[int], guild: Optional[discord.Guild]) -> str:
+    """Return a rank label suitable for the Studio UI."""
+    if not role_id or not guild:
+        return "Newcomer"
+    role = guild.get_role(role_id)
+    if not role:
+        return "Newcomer"
+    name = role.name.lower()
+    if "main character" in name:
+        return "Lead"
+    if "main cast" in name:
+        return "Principal"
+    if "supporting" in name:
+        return "Supporting"
+    if "guest" in name:
+        return "Featured"
+    if "extra" in name:
+        return "Background"
+    return "Featured"
+
+
+def get_promotion_status(screen_time: int, role_id: Optional[int]) -> str:
+    """Return a cinematic status message based on how close a member is to the next promotion."""
+    if role_id is None:
+        return "The Director has been noticing you."
+
+    next_threshold = None
+    for current_role_id in PROGRESSION_ROLES:
+        if current_role_id == role_id:
+            continue
+        threshold = SCREEN_TIME_THRESHOLDS.get(current_role_id, 0)
+        if threshold > screen_time:
+            next_threshold = threshold
+            break
+
+    if next_threshold is None:
+        return "The Director has been noticing you."
+
+    if next_threshold - screen_time <= 100:
+        return "One good performance away."
+    if next_threshold - screen_time <= 300:
+        return "Almost ready for promotion."
+    if next_threshold - screen_time <= 700:
+        return "Making steady progress."
+    return "Stealing more scenes every day."
+
+
 async def check_and_promote(guild: discord.Guild, member: discord.Member) -> Optional[discord.Role]:
     """
     Check if a user should be promoted based on screen time.

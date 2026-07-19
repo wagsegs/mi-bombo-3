@@ -132,6 +132,31 @@ async def initialize_tables() -> None:
             )
         """)
 
+        # Lore sessions table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS lore_sessions (
+                id SERIAL PRIMARY KEY,
+                guild_id BIGINT NOT NULL,
+                channel_id BIGINT NOT NULL,
+                started_by BIGINT NOT NULL,
+                started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ended_at TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Manual studio content table
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS studio_content (
+                id SERIAL PRIMARY KEY,
+                content_type TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                published_at TIMESTAMP
+            )
+        """)
+
         # Conversations table for tracking conversation groups
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS conversations (
@@ -323,6 +348,107 @@ async def save_lore(content: str, source_messages: List[int]) -> None:
         await _pool.release(conn)
 
 
+async def start_lore_session(guild_id: int, channel_id: int, started_by: int) -> bool:
+    """Start a new lore recording session if one is not already active."""
+    conn = await _get_connection()
+    try:
+        existing = await conn.fetchval(
+            "SELECT EXISTS(SELECT 1 FROM lore_sessions WHERE is_active = TRUE)"
+        )
+        if existing:
+            return False
+
+        await conn.execute(
+            "INSERT INTO lore_sessions (guild_id, channel_id, started_by, is_active) VALUES ($1, $2, $3, TRUE)",
+            guild_id,
+            channel_id,
+            started_by,
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Failed to start lore session: {e}")
+        return False
+    finally:
+        await _pool.release(conn)
+
+
+async def stop_lore_session(guild_id: int) -> bool:
+    """Stop the active lore session for a guild."""
+    conn = await _get_connection()
+    try:
+        result = await conn.execute(
+            "UPDATE lore_sessions SET is_active = FALSE, ended_at = CURRENT_TIMESTAMP WHERE guild_id = $1 AND is_active = TRUE",
+            guild_id,
+        )
+        return "UPDATE 1" in result
+    except Exception as e:
+        logger.error(f"Failed to stop lore session: {e}")
+        return False
+    finally:
+        await _pool.release(conn)
+
+
+async def get_active_lore_session(guild_id: int) -> Optional[Dict[str, Any]]:
+    """Get the currently active lore session for a guild."""
+    conn = await _get_connection()
+    try:
+        row = await conn.fetchrow(
+            "SELECT * FROM lore_sessions WHERE guild_id = $1 AND is_active = TRUE ORDER BY started_at DESC LIMIT 1",
+            guild_id,
+        )
+        return dict(row) if row else None
+    except Exception as e:
+        logger.error(f"Failed to fetch lore session: {e}")
+        return None
+    finally:
+        await _pool.release(conn)
+
+
+async def save_studio_content(content_type: str, payload: str) -> None:
+    """Store generated studio content for later publishing."""
+    conn = await _get_connection()
+    try:
+        await conn.execute(
+            "INSERT INTO studio_content (content_type, payload) VALUES ($1, $2)",
+            content_type,
+            payload,
+        )
+    except Exception as e:
+        logger.error(f"Failed to save studio content: {e}")
+    finally:
+        await _pool.release(conn)
+
+
+async def get_latest_studio_content(content_type: str) -> Optional[Dict[str, Any]]:
+    """Get the latest stored studio content entry."""
+    conn = await _get_connection()
+    try:
+        row = await conn.fetchrow(
+            "SELECT * FROM studio_content WHERE content_type = $1 ORDER BY created_at DESC LIMIT 1",
+            content_type,
+        )
+        return dict(row) if row else None
+    except Exception as e:
+        logger.error(f"Failed to fetch studio content: {e}")
+        return None
+    finally:
+        await _pool.release(conn)
+
+
+async def mark_studio_content_published(content_type: str) -> None:
+    """Mark the latest studio content entry as published."""
+    conn = await _get_connection()
+    try:
+        await conn.execute(
+            "UPDATE studio_content SET published_at = CURRENT_TIMESTAMP WHERE content_type = $1 AND published_at IS NULL ORDER BY created_at DESC LIMIT 1",
+            content_type,
+        )
+    except Exception as e:
+        logger.error(f"Failed to mark studio content as published: {e}")
+    finally:
+        await _pool.release(conn)
+
+
 async def save_weekly_cast(
     week_of: datetime,
     members: str,
@@ -353,6 +479,89 @@ async def get_users_by_screen_time_threshold(threshold: int) -> List[Dict[str, A
         return [dict(row) for row in rows]
     except Exception as e:
         logger.error(f"Failed to get users by threshold: {e}")
+        return []
+    finally:
+        await _pool.release(conn)
+
+
+async def reset_user_screen_time(user_id: int) -> int:
+    """Reset a user's screen time to zero."""
+    conn = await _get_connection()
+    try:
+        await conn.execute(
+            "UPDATE users SET screen_time = 0, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1",
+            user_id,
+        )
+        return 0
+    except Exception as e:
+        logger.error(f"Failed to reset screen time for user {user_id}: {e}")
+        return 0
+    finally:
+        await _pool.release(conn)
+
+
+async def set_user_role(user_id: int, role_id: Optional[int]) -> None:
+    """Update the current role for a user in the database."""
+    conn = await _get_connection()
+    try:
+        await conn.execute(
+            "UPDATE users SET current_role_id = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2",
+            role_id,
+            user_id,
+        )
+    except Exception as e:
+        logger.error(f"Failed to set role for user {user_id}: {e}")
+    finally:
+        await _pool.release(conn)
+
+
+async def get_user_promotion_history(user_id: int) -> List[Dict[str, Any]]:
+    """Get promotion history for a user."""
+    conn = await _get_connection()
+    try:
+        rows = await conn.fetch(
+            "SELECT * FROM promotions WHERE user_id = $1 ORDER BY created_at ASC",
+            user_id,
+        )
+        return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Failed to get promotion history: {e}")
+        return []
+    finally:
+        await _pool.release(conn)
+
+
+async def get_weekly_cast_appearances(user_id: int) -> List[str]:
+    """Get weekly cast appearance labels for a user."""
+    conn = await _get_connection()
+    try:
+        rows = await conn.fetch("SELECT members FROM weekly_cast")
+        appearances = []
+        for row in rows:
+            members = row['members']
+            if str(user_id) in members:
+                appearances.append(str(row['week_of']))
+        return appearances
+    except Exception as e:
+        logger.error(f"Failed to get weekly cast appearances: {e}")
+        return []
+    finally:
+        await _pool.release(conn)
+
+
+async def get_newspaper_features(user_id: int) -> List[str]:
+    """Get newspaper feature labels for a user."""
+    conn = await _get_connection()
+    try:
+        rows = await conn.fetch("SELECT headline, summary FROM newspapers")
+        features = []
+        for row in rows:
+            text = f"{row['headline']}"
+            if str(user_id) in row['summary']:
+                features.append(text)
+        return features
+    except Exception as e:
+        logger.error(f"Failed to get newspaper features: {e}")
         return []
     finally:
         await _pool.release(conn)

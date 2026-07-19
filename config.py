@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PREFIX = os.getenv("PREFIX", ".")
+STUDIO_PREFIX = os.getenv("STUDIO_PREFIX", "$")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
 KLIPY_URL = os.getenv("KLIPY_URL")
@@ -167,6 +168,15 @@ SCREEN_TIME_THRESHOLDS = {
     1528481587619172555: 8000,   # Box Office Legend
     1526875250313396325: 12000,  # Hall of Fame
 }
+
+# ============================================================
+# STUDIO CONFIGURATION
+# ============================================================
+MANUAL_STUDIO_MODE = True
+LORE_MIN_PARTICIPANTS = 3
+LORE_MIN_MESSAGES = 20
+LORE_MAX_AVERAGE_REPLY_GAP_SECONDS = 60
+LORE_MIN_DURATION_SECONDS = 300
 
 # ============================================================
 # SCHEDULER CONFIGURATION

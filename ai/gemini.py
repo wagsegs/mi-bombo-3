@@ -164,13 +164,15 @@ async def generate_lore_update(messages: list) -> Optional[str]:
         for msg in messages if msg['content']
     ])
 
-    prompt = f"""Based on these Discord messages, write a short lore update for the MI BOMBO Studios universe.
-Focus on character development, relationships, and ongoing storylines.
+    prompt = f"""Based on these Discord messages, create lore only from memorable community moments for the MI BOMBO Studios universe.
+Ignore personal conversations, life updates, emotional support, private discussions, and one-on-one exchanges.
+Treat the result like an episode of a comedy series: only shared, memorable, public moments become canon.
+Never create lore from people's personal lives.
 
 Messages:
 {message_texts}
 
-Write 2-3 paragraphs capturing the essence of what happened in the lore. Make it dramatic and cinematic."""
+Write 2-3 paragraphs capturing the essence of the shared comedy and community energy. Keep it dramatic, cinematic, and clearly built from memorable public moments only."""
 
     result = await generate_text(prompt)
     return result
