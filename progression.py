@@ -6,7 +6,15 @@ import discord
 from discord.ext import commands
 
 import database
-from config import PROGRESSION_ROLES, SCREEN_TIME_THRESHOLDS
+from config import (
+    PROGRESSION_ROLES,
+    SCREEN_TIME_THRESHOLDS,
+    SCREEN_TIME_REWARD_CONFIG,
+    SCREEN_TIME_PARTICIPANT_REWARD,
+    SCREEN_TIME_REPLY_REWARD,
+    SCREEN_TIME_DIMINISHING_RETURNS,
+    SCREEN_TIME_CONSISTENCY_BONUS,
+)
 from utils.output_gateway import MessageType, send_output
 
 logger = logging.getLogger(__name__)
@@ -16,6 +24,8 @@ async def calculate_screen_time_bonuses(
     message_length: int,
     conversation_participants: int,
     is_reply: bool = False,
+    recent_user_message_count: Optional[int] = None,
+    recent_user_activity_days: int = 0,
 ) -> int:
     """
     Calculate screen time bonuses modularly.
@@ -33,6 +43,8 @@ async def calculate_screen_time_bonuses(
     total += participant_bonus(conversation_participants)
     if is_reply:
         total += reply_bonus()
+    total += consistency_bonus(recent_user_activity_days)
+    total = apply_diminishing_returns(total, recent_user_message_count)
     # Future bonuses can be added here:
     # total += future_ai_bonus()
     # total += future_reaction_bonus()
@@ -42,23 +54,21 @@ async def calculate_screen_time_bonuses(
 
 def base_message_bonus(message_length: int) -> int:
     """Reward meaningful participation without double-counting message length."""
-    if message_length >= 250:
-        return 3
-    if message_length >= 100:
-        return 2
-    if message_length >= 10:
-        return 1
+    if message_length >= SCREEN_TIME_REWARD_CONFIG["long_threshold"]:
+        return SCREEN_TIME_REWARD_CONFIG["long_reward"]
+    if message_length >= SCREEN_TIME_REWARD_CONFIG["medium_threshold"]:
+        return SCREEN_TIME_REWARD_CONFIG["medium_reward"]
+    if message_length >= SCREEN_TIME_REWARD_CONFIG["short_threshold"]:
+        return SCREEN_TIME_REWARD_CONFIG["short_reward"]
     return 0
 
 
 def participant_bonus(num_participants: int) -> int:
     """Bonus for conversations with multiple participants."""
-    if num_participants >= 5:
-        return 1
     if num_participants >= 3:
-        return 1
+        return SCREEN_TIME_PARTICIPANT_REWARD
     if num_participants >= 2:
-        return 1
+        return SCREEN_TIME_PARTICIPANT_REWARD
     return 0
 
 
@@ -68,7 +78,40 @@ def reply_bonus() -> int:
     A true revival bonus should be implemented later when a message restarts an
     inactive conversation after a configurable amount of time.
     """
-    return 1
+    return SCREEN_TIME_REPLY_REWARD
+
+
+def consistency_bonus(recent_user_activity_days: int) -> int:
+    """Reward members who return over multiple days without rewarding a single burst."""
+    if recent_user_activity_days < SCREEN_TIME_CONSISTENCY_BONUS["threshold_days"]:
+        return 0
+
+    extra_days = recent_user_activity_days - SCREEN_TIME_CONSISTENCY_BONUS["threshold_days"]
+    bonus = SCREEN_TIME_CONSISTENCY_BONUS["bonus_per_day_bucket"] + (
+        extra_days // 2
+    ) * SCREEN_TIME_CONSISTENCY_BONUS["bonus_per_day_bucket"]
+    return min(bonus, SCREEN_TIME_CONSISTENCY_BONUS["max_bonus"])
+
+
+def apply_diminishing_returns(total: int, recent_user_message_count: Optional[int]) -> int:
+    """Reduce rewards for rapid-fire posting so grinding is less effective."""
+    if total <= 0 or recent_user_message_count is None:
+        return total
+
+    if recent_user_message_count <= SCREEN_TIME_DIMINISHING_RETURNS["full_reward_messages"]:
+        return total
+
+    if recent_user_message_count <= SCREEN_TIME_DIMINISHING_RETURNS["reduced_reward_messages"]:
+        progress = (recent_user_message_count - SCREEN_TIME_DIMINISHING_RETURNS["full_reward_messages"]) / max(
+            1,
+            SCREEN_TIME_DIMINISHING_RETURNS["reduced_reward_messages"] - SCREEN_TIME_DIMINISHING_RETURNS["full_reward_messages"],
+        )
+        factor = 1.0 - progress * (1.0 - SCREEN_TIME_DIMINISHING_RETURNS["minimum_reward_factor"])
+    else:
+        factor = SCREEN_TIME_DIMINISHING_RETURNS["minimum_reward_factor"]
+
+    adjusted = int(total * factor)
+    return max(1, adjusted) if total > 0 else 0
 
 
 def future_ai_bonus() -> int:
@@ -162,6 +205,10 @@ async def check_and_promote(guild: discord.Guild, member: discord.Member) -> Opt
             break
 
     if not target_role_id:
+        return None
+
+    # Skip the default role so the first celebration is the first real casting promotion.
+    if target_role_id == PROGRESSION_ROLES[0]:
         return None
 
     # Check if they already have this role

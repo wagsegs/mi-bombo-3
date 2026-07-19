@@ -19,6 +19,8 @@ from config import (
     LORE_MIN_MESSAGES,
     LORE_MAX_AVERAGE_REPLY_GAP_SECONDS,
     LORE_MIN_DURATION_SECONDS,
+    SCREEN_TIME_CONSISTENCY_BONUS,
+    SCREEN_TIME_DIMINISHING_RETURNS,
 )
 
 logger = logging.getLogger(__name__)
@@ -122,11 +124,15 @@ class MessageListenerCog(commands.Cog):
 
             num_participants = len(set(recent_messages))
 
+            recent_activity_stats = await self._get_recent_user_activity_stats(message)
+
             # Calculate screen time
             screen_time_earned = await progression.calculate_screen_time_bonuses(
                 message_length=message_length,
                 conversation_participants=num_participants,
                 is_reply=reply_to is not None,
+                recent_user_message_count=recent_activity_stats["recent_user_message_count"],
+                recent_user_activity_days=recent_activity_stats["recent_user_activity_days"],
             )
 
             if screen_time_earned > 0:
@@ -168,6 +174,30 @@ class MessageListenerCog(commands.Cog):
 
         except Exception as e:
             logger.exception(f"Error processing message {message.id}: {e}")
+
+    async def _get_recent_user_activity_stats(self, message: discord.Message) -> dict:
+        """Collect simple activity stats to tame grinding and reward consistency."""
+        window_seconds = SCREEN_TIME_DIMINISHING_RETURNS.get("window_seconds", 1800)
+        consistency_window_days = SCREEN_TIME_CONSISTENCY_BONUS.get("window_days", 7)
+
+        start_time = message.created_at - timedelta(seconds=window_seconds)
+        recent_messages = await database.get_messages_between(start_time, message.created_at)
+        user_messages = [msg for msg in recent_messages if msg.get("user_id") == message.author.id]
+
+        recent_user_message_count = len(user_messages)
+        recent_user_activity_days = 0
+        if user_messages:
+            day_set = {
+                msg.get("created_at").date()
+                for msg in user_messages
+                if msg.get("created_at") is not None
+            }
+            recent_user_activity_days = len(day_set)
+
+        return {
+            "recent_user_message_count": recent_user_message_count,
+            "recent_user_activity_days": recent_user_activity_days,
+        }
 
     async def _process_lore_candidates(self, message: discord.Message, reply_to: int | None):
         active_session = await database.get_active_lore_session(message.guild.id if message.guild else 0)

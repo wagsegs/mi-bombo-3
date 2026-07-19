@@ -156,18 +156,43 @@ STAFF_ROLES = {
     "Director": None,
 }
 
+# Screen Time progression balancing
+SCREEN_TIME_REWARD_CONFIG = {
+    "short_threshold": 10,
+    "medium_threshold": 100,
+    "long_threshold": 250,
+    "short_reward": 0,
+    "medium_reward": 1,
+    "long_reward": 2,
+}
+SCREEN_TIME_PARTICIPANT_REWARD = 1
+SCREEN_TIME_REPLY_REWARD = 1
+SCREEN_TIME_DIMINISHING_RETURNS = {
+    "window_seconds": 1800,
+    "full_reward_messages": 3,
+    "reduced_reward_messages": 8,
+    "reduction_factor": 0.5,
+    "minimum_reward_factor": 0.2,
+}
+SCREEN_TIME_CONSISTENCY_BONUS = {
+    "window_days": 7,
+    "threshold_days": 2,
+    "bonus_per_day_bucket": 1,
+    "max_bonus": 2,
+}
+
 # Screen Time thresholds for automatic promotion
 SCREEN_TIME_THRESHOLDS = {
     1526865658955038721: 0,      # members
-    1528480740491132948: 100,    # Extra
-    1526874639941242930: 250,    # Guest Star
-    1526874159496429568: 500,    # Supporting Cast
-    1526874354141626368: 1000,   # Main Cast
-    1526874419576701058: 2000,   # Main Character
-    1528481045094207679: 3500,   # Fan Favorite
-    1528481466223427725: 5500,   # Scene Stealer
-    1528481587619172555: 8000,   # Box Office Legend
-    1526875250313396325: 12000,  # Hall of Fame
+    1528480740491132948: 250,    # Extra
+    1526874639941242930: 900,    # Guest Star
+    1526874159496429568: 3200,  # Supporting Cast
+    1526874354141626368: 11000, # Main Cast
+    1526874419576701058: 32000, # Main Character
+    1528481045094207679: 90000, # Fan Favorite
+    1528481466223427725: 220000, # Scene Stealer
+    1528481587619172555: 500000, # Box Office Legend
+    1526875250313396325: 900000, # Hall of Fame
 }
 
 # ============================================================
