@@ -63,7 +63,7 @@ If I yell **"CUT!"**, that's the end of the scene.
 • Don't make me rewrite the script.
 • Give the audience a show worth watching.
 
-🔥 ───────────────────────────────────────────── 🔥
+🔥 ──────────────────── 🔥
 
 **🎬 KNOW YOUR SET**
 
@@ -94,7 +94,7 @@ VIP access.
 If you're not here, work harder.  
 Or bribe the producer.
 
-🔥 ───────────────────────────────────────────── 🔥
+🔥 ──────────────────── 🔥
 
 ### 🎬 LIGHTS!
 
