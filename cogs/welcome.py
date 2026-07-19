@@ -67,7 +67,12 @@ class WelcomeCog(commands.Cog):
             return
 
         try:
-            await channel.send(embed=embed)
+            allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)
+            await channel.send(
+                content=member.mention,
+                embed=embed,
+                allowed_mentions=allowed_mentions
+            )
         except (discord.HTTPException, discord.Forbidden, discord.InvalidArgument) as exc:
             logger.exception("Failed to send welcome embed: %s", exc)
 
