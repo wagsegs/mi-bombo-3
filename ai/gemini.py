@@ -3,6 +3,8 @@ from typing import Optional
 
 import google.generativeai as genai
 
+from config import AI_CHAT_ENABLED
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,6 +29,9 @@ async def generate_text(prompt: str, system_instruction: Optional[str] = None) -
     Returns:
         Generated text or None if failed
     """
+    if not AI_CHAT_ENABLED:
+        logger.warning("Gemini generation blocked because AI_CHAT_ENABLED is disabled")
+        return None
     try:
         model = genai.GenerativeModel(
             model_name="gemini-1.5-flash",

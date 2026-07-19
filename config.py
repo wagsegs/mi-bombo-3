@@ -117,6 +117,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # AI CONFIGURATION
 # ============================================================
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+AI_CHAT_ENABLED = os.getenv("AI_CHAT_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 
 # ============================================================
 # SERVER & CHANNELS

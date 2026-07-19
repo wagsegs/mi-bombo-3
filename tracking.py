@@ -9,6 +9,7 @@ from config import (
     LORE_MAX_AVERAGE_REPLY_GAP_SECONDS,
     LORE_MIN_DURATION_SECONDS,
 )
+from utils.timezone import ensure_utc_datetime, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,8 @@ class ConversationTracker:
         - Time proximity (within 30 minutes)
         - Reply chains
         """
+        normalized_timestamp = ensure_utc_datetime(timestamp) or utc_now()
+
         # Check if this is a reply to an existing message
         if reply_to:
             for conv_id, conv in self.conversations.items():
@@ -114,7 +117,7 @@ class ConversationTracker:
                     return conv_id
 
         # Find active conversations in this channel within 30 minutes
-        time_window = timestamp - timedelta(minutes=30)
+        time_window = normalized_timestamp - timedelta(minutes=30)
         for conv_id, conv in self.conversations.items():
             if (conv.channel_id == channel_id and
                 conv.last_message_time >= time_window):
@@ -123,7 +126,7 @@ class ConversationTracker:
         # Create new conversation
         conv_id = max(self.conversations.keys()) + 1 if self.conversations else 1
         self.conversations[conv_id] = Conversation(
-            conv_id, channel_id, timestamp
+            conv_id, channel_id, normalized_timestamp
         )
         return conv_id
 
@@ -137,7 +140,7 @@ class ConversationTracker:
 
     def get_recent_conversations(self, hours: int = 24) -> List['Conversation']:
         """Get conversations from the last N hours."""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = utc_now() - timedelta(hours=hours)
         recent = [
             conv for conv in self.conversations.values()
             if conv.last_message_time >= cutoff
@@ -146,7 +149,7 @@ class ConversationTracker:
 
     def clear_old_conversations(self, hours: int = 72) -> None:
         """Clear conversations older than N hours."""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = utc_now() - timedelta(hours=hours)
         to_remove = [
             conv_id for conv_id, conv in self.conversations.items()
             if conv.last_message_time < cutoff
@@ -162,8 +165,8 @@ class Conversation:
     def __init__(self, conv_id: int, channel_id: int, started_at: datetime):
         self.id = conv_id
         self.channel_id = channel_id
-        self.started_at = started_at
-        self.last_message_time = started_at
+        self.started_at = ensure_utc_datetime(started_at) or utc_now()
+        self.last_message_time = self.started_at
         self.message_ids: List[int] = []
         self.participant_ids: set = set()
         self.content: List[str] = []
@@ -176,10 +179,11 @@ class Conversation:
         timestamp: datetime,
     ) -> None:
         """Add a message to this conversation."""
+        normalized_timestamp = ensure_utc_datetime(timestamp) or utc_now()
         self.message_ids.append(message_id)
         self.participant_ids.add(user_id)
         self.content.append(content)
-        self.last_message_time = timestamp
+        self.last_message_time = normalized_timestamp
 
     def contains_topic(self, topic: str) -> bool:
         """Check if conversation contains a topic."""

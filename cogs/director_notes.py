@@ -1,8 +1,11 @@
+import asyncio
 import logging
 from pathlib import Path
 
 import discord
 from discord.ext import commands
+
+from utils.output_gateway import MessageType, send_output
 
 from config import (
     DIRECTORS_COLOR,
@@ -24,7 +27,14 @@ class DirectorNotesCog(commands.Cog):
     async def rules(self, ctx):
         if await self._has_recent_directors_notes(ctx):
             try:
-                reply = await ctx.reply("Director's Notes already posted recently.")
+                reply = await send_output(
+                    ctx,
+                    content="Director's Notes already posted recently.",
+                    message_type=MessageType.DIRECTOR_NOTES,
+                    module="cogs.director_notes",
+                    channel=ctx.channel,
+                    reply=True,
+                )
                 await asyncio.sleep(3)
                 await reply.delete()
             except (discord.HTTPException, discord.Forbidden, discord.InvalidArgument):
@@ -38,15 +48,34 @@ class DirectorNotesCog(commands.Cog):
             media_path = Path(DIRECTORS_MEDIA)
             if not media_path.exists():
                 logger.warning("Director's notes media file not found: %s", DIRECTORS_MEDIA)
-                await ctx.send(embed=self._build_embed(ctx))
+                await send_output(
+                    ctx,
+                    embed=self._build_embed(ctx),
+                    message_type=MessageType.DIRECTOR_NOTES,
+                    module="cogs.director_notes",
+                    channel=ctx.channel,
+                )
                 return
 
             file = discord.File(media_path, filename=media_path.name)
-            await ctx.send(embed=self._build_embed(ctx), file=file)
+            await send_output(
+                ctx,
+                embed=self._build_embed(ctx),
+                file=file,
+                message_type=MessageType.DIRECTOR_NOTES,
+                module="cogs.director_notes",
+                channel=ctx.channel,
+            )
         except (discord.HTTPException, discord.Forbidden, discord.InvalidArgument) as exc:
             logger.exception("Failed to send director's notes: %s", exc)
             try:
-                await ctx.send(embed=self._build_embed(ctx))
+                await send_output(
+                    ctx,
+                    embed=self._build_embed(ctx),
+                    message_type=MessageType.DIRECTOR_NOTES,
+                    module="cogs.director_notes",
+                    channel=ctx.channel,
+                )
             except Exception as fallback_exc:
                 logger.exception("Fallback director's notes send failed: %s", fallback_exc)
 

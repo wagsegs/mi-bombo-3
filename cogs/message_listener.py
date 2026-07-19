@@ -8,7 +8,10 @@ import database
 import progression
 import tracking
 from ai import gemini
+from utils.output_gateway import MessageType, send_output
+from utils.timezone import utc_now
 from config import (
+    AI_CHAT_ENABLED,
     EXCLUDED_TRACKING_CHANNELS,
     PREFIX,
     STUDIO_PREFIX,
@@ -151,7 +154,13 @@ class MessageListenerCog(commands.Cog):
                                 new_role,
                             )
                             try:
-                                await casting_channel.send(embed=embed)
+                                await send_output(
+                                    casting_channel,
+                                    embed=embed,
+                                    message_type=MessageType.PROMOTION,
+                                    module="cogs.message_listener",
+                                    channel=casting_channel,
+                                )
                             except discord.Forbidden:
                                 logger.error(f"Missing permissions to post in casting channel {CASTING_CHANNEL_ID}")
                             except Exception as e:
@@ -202,19 +211,20 @@ class MessageListenerCog(commands.Cog):
         if not source_ids:
             return
 
-        lore_text = await gemini.generate_lore_update([
-            {
-                'username': msg.author.name,
-                'content': msg.content,
-                'created_at': msg.created_at,
-                'user_id': msg.author.id,
-            }
-            for msg in recent_messages
-            if not msg.author.bot
-        ])
+        if AI_CHAT_ENABLED:
+            lore_text = await gemini.generate_lore_update([
+                {
+                    'username': msg.author.name,
+                    'content': msg.content,
+                    'created_at': msg.created_at,
+                    'user_id': msg.author.id,
+                }
+                for msg in recent_messages
+                if not msg.author.bot
+            ])
 
-        if lore_text:
-            await database.save_lore(lore_text, source_ids)
+            if lore_text:
+                await database.save_lore(lore_text, source_ids)
 
     @commands.command(name="screentime", aliases=["st"])
     async def check_screen_time(self, ctx: commands.Context, member: discord.Member = None):
@@ -224,7 +234,13 @@ class MessageListenerCog(commands.Cog):
         try:
             user = await database.get_user(target.id)
             if not user:
-                await ctx.send(f"No data found for {target.mention}")
+                await send_output(
+                    ctx,
+                    content=f"No data found for {target.mention}",
+                    message_type=MessageType.COMMAND_RESPONSE,
+                    module="cogs.message_listener",
+                    channel=ctx.channel,
+                )
                 return
 
             screen_time = user.get('screen_time', 0) or 0
@@ -244,11 +260,23 @@ class MessageListenerCog(commands.Cog):
             embed.add_field(name="Current Rank", value=f"**{rank_name}**", inline=True)
             embed.set_thumbnail(url=target.display_avatar.url)
 
-            await ctx.send(embed=embed)
+            await send_output(
+                ctx,
+                embed=embed,
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.message_listener",
+                channel=ctx.channel,
+            )
 
         except Exception as e:
             logger.exception(f"Error checking screen time for {target.id}: {e}")
-            await ctx.send("Failed to check screen time.")
+            await send_output(
+                ctx,
+                content="Failed to check screen time.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.message_listener",
+                channel=ctx.channel,
+            )
 
     @commands.command(name="leaderboard")
     async def leaderboard(self, ctx: commands.Context):
@@ -256,11 +284,18 @@ class MessageListenerCog(commands.Cog):
         try:
             members = await database.get_users_by_screen_time_threshold(0)
             if not members:
-                await ctx.send("The studio has not recorded enough performances yet.")
+                await send_output(
+                    ctx,
+                    content="The studio has not recorded enough performances yet.",
+                    message_type=MessageType.COMMAND_RESPONSE,
+                    module="cogs.message_listener",
+                    channel=ctx.channel,
+                )
                 return
 
             async def message_count_for(user_id: int) -> int:
-                rows = await database.get_messages_between(datetime.utcnow() - timedelta(days=30), datetime.utcnow())
+                now = utc_now()
+                rows = await database.get_messages_between(now - timedelta(days=30), now)
                 return sum(1 for row in rows if row.get('user_id') == user_id)
 
             ranked = []
@@ -281,11 +316,23 @@ class MessageListenerCog(commands.Cog):
                 role_name = progression.get_role_name(user.get('current_role_id'), ctx.guild)
                 embed.add_field(name=f"{medal} {user.get('nickname') or user.get('username')}", value=role_name, inline=False)
 
-            await ctx.send(embed=embed)
+            await send_output(
+                ctx,
+                embed=embed,
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.message_listener",
+                channel=ctx.channel,
+            )
 
         except Exception as e:
             logger.exception(f"Error generating leaderboard: {e}")
-            await ctx.send("Failed to generate the studio leaderboard.")
+            await send_output(
+                ctx,
+                content="Failed to generate the studio leaderboard.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.message_listener",
+                channel=ctx.channel,
+            )
 
     @commands.command(name="profile")
     async def profile(self, ctx: commands.Context, member: discord.Member = None):
@@ -294,7 +341,13 @@ class MessageListenerCog(commands.Cog):
         try:
             user = await database.get_user(target.id)
             if not user:
-                await ctx.send(f"No profile found for {target.mention}")
+                await send_output(
+                    ctx,
+                    content=f"No profile found for {target.mention}",
+                    message_type=MessageType.COMMAND_RESPONSE,
+                    module="cogs.message_listener",
+                    channel=ctx.channel,
+                )
                 return
 
             role_name = progression.get_role_name(user.get('current_role_id'), ctx.guild)
@@ -327,11 +380,23 @@ class MessageListenerCog(commands.Cog):
             embed.add_field(name="Newspaper Features", value=f"**{newspaper_text}**", inline=False)
             embed.set_thumbnail(url=target.display_avatar.url)
 
-            await ctx.send(embed=embed)
+            await send_output(
+                ctx,
+                embed=embed,
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.message_listener",
+                channel=ctx.channel,
+            )
 
         except Exception as e:
             logger.exception(f"Error generating profile for {target.id}: {e}")
-            await ctx.send("Failed to generate the actor profile.")
+            await send_output(
+                ctx,
+                content="Failed to generate the actor profile.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.message_listener",
+                channel=ctx.channel,
+            )
 
 
 async def setup(bot: commands.Bot):

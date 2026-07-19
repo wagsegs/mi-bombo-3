@@ -21,6 +21,7 @@ from config import (
      LORE_MIN_DURATION_SECONDS,
 )
 import tracking
+from utils.output_gateway import MessageType, send_output
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,13 @@ class StudioManagementCog(commands.Cog):
 
     async def _ensure_owner(self, ctx: commands.Context) -> bool:
         if not ctx.guild or ctx.author.id != ctx.guild.owner_id:
-            await ctx.send("🎬 The Director's Console is for the Studio Director only.")
+            await send_output(
+                ctx,
+                content="🎬 The Director's Console is for the Studio Director only.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return False
         return True
 
@@ -62,7 +69,13 @@ class StudioManagementCog(commands.Cog):
             value="• $promote — Promote a member to a role\n• $demote — Remove progression roles\n• $resetscreentime — Reset a user's screen time\n• $reloadscheduler — Reload the scheduler\n• $testnewspaper — Generate a newspaper preview\n• $testcast — Generate a cast preview",
             inline=False,
         )
-        await ctx.send(embed=embed)
+        await send_output(
+            ctx,
+            embed=embed,
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="news")
     async def news(self, ctx: commands.Context):
@@ -71,7 +84,13 @@ class StudioManagementCog(commands.Cog):
         if MANUAL_STUDIO_MODE:
             await self._generate_and_preview_newspaper(ctx)
             return
-        await ctx.send("Automatic Studio publishing is currently disabled in manual mode.")
+        await send_output(
+            ctx,
+            content="Automatic Studio publishing is currently disabled in manual mode.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="publishnews")
     async def publishnews(self, ctx: commands.Context):
@@ -79,17 +98,41 @@ class StudioManagementCog(commands.Cog):
             return
         content = await database.get_latest_studio_content("newspaper")
         if not content:
-            await ctx.send("No generated newspaper is stored yet.")
+            await send_output(
+                ctx,
+                content="No generated newspaper is stored yet.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         channel = self.bot.get_channel(NEWSPAPER_CHANNEL_ID)
         if not channel:
-            await ctx.send("The newspaper channel is not available.")
+            await send_output(
+                ctx,
+                content="The newspaper channel is not available.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         payload = json.loads(content["payload"])
         embed = self._build_newspaper_embed(payload)
-        await channel.send(embed=embed)
+        await send_output(
+            channel,
+            embed=embed,
+            message_type=MessageType.NEWSPAPER,
+            module="cogs.studio_management",
+            channel=channel,
+        )
         await database.mark_studio_content_published("newspaper")
-        await ctx.send("The newspaper has been published to the studio bulletin.")
+        await send_output(
+            ctx,
+            content="The newspaper has been published to the studio bulletin.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="weeklycast")
     async def weeklycast(self, ctx: commands.Context):
@@ -98,7 +141,13 @@ class StudioManagementCog(commands.Cog):
         if MANUAL_STUDIO_MODE:
             await self._generate_and_preview_weekly_cast(ctx)
             return
-        await ctx.send("Automatic Studio publishing is currently disabled in manual mode.")
+        await send_output(
+            ctx,
+            content="Automatic Studio publishing is currently disabled in manual mode.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="publishcast")
     async def publishcast(self, ctx: commands.Context):
@@ -106,17 +155,41 @@ class StudioManagementCog(commands.Cog):
             return
         content = await database.get_latest_studio_content("weekly_cast")
         if not content:
-            await ctx.send("No generated weekly cast is stored yet.")
+            await send_output(
+                ctx,
+                content="No generated weekly cast is stored yet.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         channel = self.bot.get_channel(WEEKLY_CAST_CHANNEL_ID)
         if not channel:
-            await ctx.send("The weekly cast channel is not available.")
+            await send_output(
+                ctx,
+                content="The weekly cast channel is not available.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         payload = json.loads(content["payload"])
         embed = self._build_weekly_cast_embed(payload)
-        await channel.send(embed=embed)
+        await send_output(
+            channel,
+            embed=embed,
+            message_type=MessageType.WEEKLY_CAST,
+            module="cogs.studio_management",
+            channel=channel,
+        )
         await database.mark_studio_content_published("weekly_cast")
-        await ctx.send("The weekly cast has been published to the studio bulletin.")
+        await send_output(
+            ctx,
+            content="The weekly cast has been published to the studio bulletin.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="lorestart")
     async def lorestart(self, ctx: commands.Context):
@@ -124,9 +197,21 @@ class StudioManagementCog(commands.Cog):
             return
         started = await database.start_lore_session(ctx.guild.id, ctx.channel.id, ctx.author.id)
         if not started:
-            await ctx.send("A lore recording session is already active.")
+            await send_output(
+            ctx,
+            content="A lore recording session is already active.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
             return
-        await ctx.send("🎬 Lore recording is now live. Future eligible conversations will be considered for studio lore.")
+        await send_output(
+            ctx,
+            content="🎬 Lore recording is now live. Future eligible conversations will be considered for studio lore.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="lorestop")
     async def lorestop(self, ctx: commands.Context):
@@ -134,15 +219,33 @@ class StudioManagementCog(commands.Cog):
             return
         stopped = await database.stop_lore_session(ctx.guild.id)
         if not stopped:
-            await ctx.send("No active lore recording session was found.")
+            await send_output(
+            ctx,
+            content="No active lore recording session was found.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
             return
-        await ctx.send("📖 Lore recording has ended.")
+        await send_output(
+            ctx,
+            content="📖 Lore recording has ended.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="testlore")
     async def testlore(self, ctx: commands.Context):
         if not await self._ensure_owner(ctx):
             return
-        await ctx.send("Lore generation is available through the manual Studio workflow once eligible conversations are collected.")
+        await send_output(
+            ctx,
+            content="Lore generation is available through the manual Studio workflow once eligible conversations are collected.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="dailies")
     async def dailies(self, ctx: commands.Context, conversation_number: Optional[str] = None):
@@ -153,11 +256,23 @@ class StudioManagementCog(commands.Cog):
             try:
                 conv_id = int(conversation_number)
             except ValueError:
-                await ctx.send("Please provide a valid conversation number.")
+                await send_output(
+                    ctx,
+                    content="Please provide a valid conversation number.",
+                    message_type=MessageType.COMMAND_RESPONSE,
+                    module="cogs.studio_management",
+                    channel=ctx.channel,
+                )
                 return
             detail = await database.get_conversation_detail(conv_id)
             if not detail:
-                await ctx.send(f"No conversation found with the number {conv_id}.")
+                await send_output(
+                    ctx,
+                    content=f"No conversation found with the number {conv_id}.",
+                    message_type=MessageType.COMMAND_RESPONSE,
+                    module="cogs.studio_management",
+                    channel=ctx.channel,
+                )
                 return
             await self._send_conversation_detail_embed(ctx, detail)
             return
@@ -170,7 +285,13 @@ class StudioManagementCog(commands.Cog):
         )
         if not summaries:
             embed.add_field(name="No Dailies Recorded", value="No tracked conversations have been recorded yet.", inline=False)
-            await ctx.send(embed=embed)
+            await send_output(
+                ctx,
+                embed=embed,
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
 
         for row in summaries:
@@ -216,7 +337,13 @@ class StudioManagementCog(commands.Cog):
                 lines.extend(f"• {reason}" for reason in reasons)
             embed.add_field(name="\u200b", value="\n".join(lines), inline=False)
 
-        await ctx.send(embed=embed)
+        await send_output(
+            ctx,
+            embed=embed,
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     async def _send_conversation_detail_embed(self, ctx: commands.Context, detail: dict):
         started_at = detail.get('started_at')
@@ -249,7 +376,13 @@ class StudioManagementCog(commands.Cog):
             embed.add_field(name="Reasons", value="\n".join(f"• {reason}" for reason in reasons), inline=False)
         transcript = self._build_transcript_preview(message_rows)
         embed.add_field(name="Transcript Preview", value=transcript, inline=False)
-        await ctx.send(embed=embed)
+        await send_output(
+            ctx,
+            embed=embed,
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     def _build_transcript_preview(self, messages: list, limit: int = 30, max_chars: int = 900) -> str:
         preview_messages = messages[:limit]
@@ -293,7 +426,13 @@ class StudioManagementCog(commands.Cog):
             return
         scheduler.initialize(self.bot)
         await scheduler.start()
-        await ctx.send("Scheduler reloaded.")
+        await send_output(
+            ctx,
+            content="Scheduler reloaded.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="promote")
     async def promote(self, ctx: commands.Context, member: discord.Member, role: discord.Role):
@@ -308,7 +447,13 @@ class StudioManagementCog(commands.Cog):
         await member.add_roles(role, reason="Studio admin promotion")
         await database.set_user_role(member.id, role.id)
         await database.promote_user(member.id, current_role_id, role.id)
-        await ctx.send(f"{member.mention} has been promoted to {role.mention}.")
+        await send_output(
+            ctx,
+            content=f"{member.mention} has been promoted to {role.mention}.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="demote")
     async def demote(self, ctx: commands.Context, member: discord.Member):
@@ -319,14 +464,26 @@ class StudioManagementCog(commands.Cog):
             if role and role in member.roles:
                 await member.remove_roles(role, reason="Studio admin demotion")
         await database.set_user_role(member.id, None)
-        await ctx.send(f"{member.mention} has been demoted from progression roles.")
+        await send_output(
+            ctx,
+            content=f"{member.mention} has been demoted from progression roles.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="resetscreentime")
     async def resetscreentime(self, ctx: commands.Context, member: discord.Member):
         if not await self._ensure_owner(ctx):
             return
         await database.reset_user_screen_time(member.id)
-        await ctx.send(f"{member.mention}'s screen time has been reset.")
+        await send_output(
+            ctx,
+            content=f"{member.mention}'s screen time has been reset.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     @commands.command(name="testnewspaper")
     async def testnewspaper(self, ctx: commands.Context):
@@ -341,44 +498,92 @@ class StudioManagementCog(commands.Cog):
         await self._generate_and_preview_weekly_cast(ctx)
 
     async def _generate_and_preview_newspaper(self, ctx: commands.Context):
-        end_time = datetime.utcnow()
+        end_time = utc_now()
         start_time = end_time - timedelta(hours=24)
         messages = await database.get_messages_between(start_time, end_time)
         if not messages:
-            await ctx.send("No recent messages were found for a newspaper preview.")
+            await send_output(
+                ctx,
+                content="No recent messages were found for a newspaper preview.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         newspaper_json = await gemini.generate_newspaper_data(messages)
         if not newspaper_json:
-            await ctx.send("The studio could not generate a newspaper preview right now.")
+            await send_output(
+                ctx,
+                content="The studio could not generate a newspaper preview right now.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         try:
             data = json.loads(newspaper_json)
         except json.JSONDecodeError:
-            await ctx.send("The studio received an invalid newspaper draft.")
+            await send_output(
+                ctx,
+                content="The studio received an invalid newspaper draft.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         await database.save_studio_content("newspaper", json.dumps(data))
         embed = self._build_newspaper_embed(data)
-        await ctx.send(embed=embed)
+        await send_output(
+            ctx,
+            embed=embed,
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     async def _generate_and_preview_weekly_cast(self, ctx: commands.Context):
-        end_time = datetime.utcnow()
+        end_time = utc_now()
         start_time = end_time - timedelta(days=7)
         messages = await database.get_messages_between(start_time, end_time)
         if not messages:
-            await ctx.send("No recent messages were found for a weekly cast preview.")
+            await send_output(
+                ctx,
+                content="No recent messages were found for a weekly cast preview.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         cast_json = await gemini.generate_weekly_cast_data(messages)
         if not cast_json:
-            await ctx.send("The studio could not generate a weekly cast preview right now.")
+            await send_output(
+                ctx,
+                content="The studio could not generate a weekly cast preview right now.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         try:
             data = json.loads(cast_json)
         except json.JSONDecodeError:
-            await ctx.send("The studio received an invalid weekly cast draft.")
+            await send_output(
+                ctx,
+                content="The studio received an invalid weekly cast draft.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
             return
         await database.save_studio_content("weekly_cast", json.dumps(data))
         embed = self._build_weekly_cast_embed(data)
-        await ctx.send(embed=embed)
+        await send_output(
+            ctx,
+            embed=embed,
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=ctx.channel,
+        )
 
     def _build_newspaper_embed(self, data: dict) -> discord.Embed:
         embed = discord.Embed(

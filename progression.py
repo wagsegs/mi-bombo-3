@@ -7,6 +7,7 @@ from discord.ext import commands
 
 import database
 from config import PROGRESSION_ROLES, SCREEN_TIME_THRESHOLDS
+from utils.output_gateway import MessageType, send_output
 
 logger = logging.getLogger(__name__)
 
@@ -254,18 +255,36 @@ class ProgressionCog(commands.Cog):
         guild = ctx.guild
 
         if not guild:
-            await ctx.send("This command only works in a guild.")
+            await send_output(
+                ctx,
+                content="This command only works in a guild.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="progression",
+                channel=ctx.channel,
+            )
             return
 
         new_role = await check_and_promote(guild, member)
 
         if new_role:
             embed = await create_casting_update_embed(member, new_role)
-            await ctx.send(embed=embed)
+            await send_output(
+                ctx,
+                embed=embed,
+                message_type=MessageType.PROMOTION,
+                module="progression",
+                channel=ctx.channel,
+            )
         else:
             user = await database.get_user(member.id)
             screen_time = user['screen_time'] if user else 0
-            await ctx.send(f"No promotion available. Current screen time: {screen_time}")
+            await send_output(
+                ctx,
+                content=f"No promotion available. Current screen time: {screen_time}",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="progression",
+                channel=ctx.channel,
+            )
 
 
 async def setup(bot: commands.Bot):

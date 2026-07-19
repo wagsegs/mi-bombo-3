@@ -17,6 +17,8 @@ from config import (
     NEWSPAPER_CHANNEL_ID,
     WEEKLY_CAST_CHANNEL_ID,
 )
+from utils.output_gateway import MessageType, send_output
+from utils.timezone import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +109,7 @@ async def _job_newspaper() -> None:
         logger.info("📰 Starting daily newspaper generation...")
 
         # Get messages from last 24 hours
-        end_time = datetime.utcnow()
+        end_time = utc_now()
         start_time = end_time - timedelta(hours=24)
         messages = await database.get_messages_between(start_time, end_time)
 
@@ -180,7 +182,13 @@ async def _job_newspaper() -> None:
             embed.set_image(url=image_url)
 
         embed.set_footer(text="MI BOMBO Studios Daily Newspaper")
-        await channel.send(embed=embed)
+        await send_output(
+            channel,
+            embed=embed,
+            message_type=MessageType.NEWSPAPER,
+            module="scheduler",
+            channel=channel,
+        )
 
         logger.info("✓ Daily newspaper posted")
 
@@ -197,7 +205,7 @@ async def _job_weekly_cast() -> None:
         logger.info("🎭 Starting weekly cast generation...")
 
         # Get messages from last 7 days
-        end_time = datetime.utcnow()
+        end_time = utc_now()
         start_time = end_time - timedelta(days=7)
         messages = await database.get_messages_between(start_time, end_time)
 
@@ -262,7 +270,13 @@ async def _job_weekly_cast() -> None:
             embed.set_image(url=image_url)
 
         embed.set_footer(text="MI BOMBO Studios Weekly Cast")
-        await channel.send(embed=embed)
+        await send_output(
+            channel,
+            embed=embed,
+            message_type=MessageType.WEEKLY_CAST,
+            module="scheduler",
+            channel=channel,
+        )
 
         logger.info("✓ Weekly cast posted")
 

@@ -4,6 +4,8 @@ import random
 import discord
 from discord.ext import commands
 
+from utils.output_gateway import MessageType, send_output
+
 from config import (
     WELCOME_CHANNEL_ID,
     WELCOME_EMBED_COLOR,
@@ -68,10 +70,14 @@ class WelcomeCog(commands.Cog):
 
         try:
             allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)
-            await channel.send(
+            await send_output(
+                channel,
                 content=member.mention,
                 embed=embed,
-                allowed_mentions=allowed_mentions
+                allowed_mentions=allowed_mentions,
+                message_type=MessageType.WELCOME,
+                module="cogs.welcome",
+                channel=channel,
             )
         except (discord.HTTPException, discord.Forbidden, discord.InvalidArgument) as exc:
             logger.exception("Failed to send welcome embed: %s", exc)

@@ -1,8 +1,10 @@
 import asyncio
+import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -15,6 +17,7 @@ class DummyContext:
     def __init__(self, author_id=1, owner_id=1):
         self.author = SimpleNamespace(id=author_id)
         self.guild = SimpleNamespace(owner_id=owner_id)
+        self.channel = self
         self.sent = []
 
     async def send(self, *args, **kwargs):
@@ -87,3 +90,42 @@ def test_dailies_detail_preview_for_specific_conversation(monkeypatch):
     assert embed is not None
     assert "Alice" in embed.fields[-1].value
     assert "bro who deleted the train" in embed.fields[-1].value
+
+
+def test_publishnews_uses_output_gateway(monkeypatch):
+    class FakeChannel:
+        def __init__(self):
+            self.sent = []
+
+        async def send(self, *args, **kwargs):
+            self.sent.append((args, kwargs))
+            return None
+
+    channel = FakeChannel()
+    bot = DummyBot()
+    bot.get_channel = lambda channel_id: channel
+    cog = studio_management.StudioManagementCog(bot)
+    ctx = DummyContext(author_id=1, owner_id=1)
+
+    async def fake_get_latest_studio_content(*args, **kwargs):
+        return {"payload": json.dumps({"headline": "Studio Update"})}
+
+    async def fake_mark_studio_content_published(*args, **kwargs):
+        return None
+
+    calls = []
+
+    async def fake_send_output(destination, **kwargs):
+        calls.append((destination, kwargs))
+        return None
+
+    monkeypatch.setattr(studio_management.database, "get_latest_studio_content", fake_get_latest_studio_content)
+    monkeypatch.setattr(studio_management.database, "mark_studio_content_published", fake_mark_studio_content_published)
+    monkeypatch.setattr(studio_management, "send_output", fake_send_output)
+
+    asyncio.run(cog.publishnews.callback(cog, ctx))
+
+    assert any(
+        destination is channel and kwargs.get("message_type") == studio_management.MessageType.NEWSPAPER
+        for destination, kwargs in calls
+    )

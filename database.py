@@ -4,9 +4,20 @@ from typing import Optional, List, Dict, Any
 
 import asyncpg
 
+from utils.timezone import ensure_utc_datetime, to_db_timestamp
+
 logger = logging.getLogger(__name__)
 
 _pool: Optional[asyncpg.Pool] = None
+
+
+def _normalize_timestamp_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure timestamp fields are timezone-aware UTC datetimes when used in Python."""
+    normalized = dict(payload)
+    for key in ("started_at", "ended_at", "created_at"):
+        if key in normalized and normalized[key] is not None:
+            normalized[key] = ensure_utc_datetime(normalized[key])
+    return normalized
 
 
 async def connect(database_url: str) -> None:
@@ -264,7 +275,8 @@ async def save_conversation_snapshot(
                 participant_ids = EXCLUDED.participant_ids,
                 started_at = EXCLUDED.started_at,
                 ended_at = EXCLUDED.ended_at
-        """, conversation_id, channel_id, channel_name, message_ids, participant_ids, started_at, ended_at)
+        """, conversation_id, channel_id, channel_name, message_ids, participant_ids,
+            to_db_timestamp(started_at), to_db_timestamp(ended_at))
     except Exception as e:
         logger.error(f"Failed to save conversation snapshot {conversation_id}: {e}")
     finally:
@@ -282,7 +294,7 @@ async def get_recent_conversation_summaries(limit: int = 5) -> List[Dict[str, An
             ORDER BY started_at DESC
             LIMIT $1
         """, limit)
-        return [dict(row) for row in rows]
+        return [_normalize_timestamp_fields(dict(row)) for row in rows]
     except Exception as e:
         logger.error(f"Failed to get recent conversations: {e}")
         return []
@@ -311,7 +323,7 @@ async def get_conversation_detail(conversation_id: int) -> Optional[Dict[str, An
                 WHERE message_id = ANY($1::BIGINT[])
                 ORDER BY created_at ASC, message_id ASC
             """, message_ids)
-            messages = [dict(msg) for msg in message_rows]
+            messages = [_normalize_timestamp_fields(dict(msg)) for msg in message_rows]
         user_rows = await conn.fetch("""
             SELECT user_id, username, nickname FROM users WHERE user_id = ANY($1::BIGINT[])
         """, participant_ids) if participant_ids else []
@@ -319,7 +331,7 @@ async def get_conversation_detail(conversation_id: int) -> Optional[Dict[str, An
             row['user_id']: row['nickname'] or row['username']
             for row in user_rows
         }
-        payload = dict(row)
+        payload = _normalize_timestamp_fields(dict(row))
         payload['message_count'] = len(message_ids)
         payload['participant_count'] = len(participant_ids)
         payload['participants'] = [users_by_id.get(user_id, str(user_id)) for user_id in participant_ids]
@@ -396,8 +408,8 @@ async def get_messages_between(start_time: datetime, end_time: datetime) -> List
             SELECT * FROM messages
             WHERE created_at >= $1 AND created_at <= $2
             ORDER BY created_at ASC
-        """, start_time, end_time)
-        return [dict(row) for row in rows]
+        """, to_db_timestamp(start_time), to_db_timestamp(end_time))
+        return [_normalize_timestamp_fields(dict(row)) for row in rows]
     except Exception as e:
         logger.error(f"Failed to get messages: {e}")
         return []

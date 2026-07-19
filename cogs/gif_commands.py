@@ -6,6 +6,7 @@ from discord.ext import commands
 from config import PREFIX
 from utils.gif_api import fetch_gif
 from utils.embeds import create_gif_embed
+from utils.output_gateway import MessageType, send_output
 
 
 def extract_custom_query(content, prefix="."):
@@ -144,8 +145,12 @@ async def _apply_cooldown(ctx, cooldown_time=None):
     remaining = get_remaining(ctx.author.id)
 
     if remaining > 0:
-        await ctx.send(
-            f"⏳ Post nut clarity is here. Try again in {remaining}s."
+        await send_output(
+            ctx,
+            content=f"⏳ Post nut clarity is here. Try again in {remaining}s.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.gif_commands",
+            channel=ctx.channel,
         )
         return False
 
@@ -177,8 +182,12 @@ async def run_action(ctx, command_name):
     mentions = ctx.message.mentions
 
     if len(mentions) > 4:
-        await ctx.send(
-            "❌ Maximum 4 users can be targeted."
+        await send_output(
+            ctx,
+            content="❌ Maximum 4 users can be targeted.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.gif_commands",
+            channel=ctx.channel,
         )
         return
 
@@ -197,8 +206,12 @@ async def run_action(ctx, command_name):
     )
 
     if not gif:
-        await ctx.send(
-            "❌ No GIF found."
+        await send_output(
+            ctx,
+            content="❌ No GIF found.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.gif_commands",
+            channel=ctx.channel,
         )
         return
 
@@ -208,23 +221,37 @@ async def run_action(ctx, command_name):
         gif
     )
 
-    await ctx.send(embed=embed)
+    await send_output(
+        ctx,
+        embed=embed,
+        message_type=MessageType.COMMAND_RESPONSE,
+        module="cogs.gif_commands",
+        channel=ctx.channel,
+    )
 
 
 async def run_custom_action(ctx):
     mentions = ctx.message.mentions
 
     if len(mentions) > 4:
-        await ctx.send(
-            "❌ Maximum 4 users can be targeted."
+        await send_output(
+            ctx,
+            content="❌ Maximum 4 users can be targeted.",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.gif_commands",
+            channel=ctx.channel,
         )
         return
 
     query, description = build_custom_gif_details(ctx, PREFIX)
 
     if not query or not description:
-        await ctx.send(
-            "Please provide something to search for.\n\nExample:\n.c door shutting"
+        await send_output(
+            ctx,
+            content="Please provide something to search for.\n\nExample:\n.c door shutting",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.gif_commands",
+            channel=ctx.channel,
         )
         return
 
@@ -234,8 +261,12 @@ async def run_custom_action(ctx):
     gif = await fetch_gif(query)
 
     if not gif:
-        await ctx.send(
-            f"Couldn't find any GIFs for:\n{query}"
+        await send_output(
+            ctx,
+            content=f"Couldn't find any GIFs for:\n{query}",
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.gif_commands",
+            channel=ctx.channel,
         )
         return
 
@@ -245,7 +276,13 @@ async def run_custom_action(ctx):
         gif
     )
 
-    await ctx.send(embed=embed)
+    await send_output(
+        ctx,
+        embed=embed,
+        message_type=MessageType.COMMAND_RESPONSE,
+        module="cogs.gif_commands",
+        channel=ctx.channel,
+    )
 
 
 def create_command(command_name):
@@ -270,8 +307,12 @@ def create_custom_command():
         query = " ".join(args)
 
         if not query:
-            await ctx.send(
-                "Please provide something to search for.\n\nExample:\n.c door shutting"
+            await send_output(
+                ctx,
+                content="Please provide something to search for.\n\nExample:\n.c door shutting",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.gif_commands",
+                channel=ctx.channel,
             )
             return
 
@@ -309,7 +350,13 @@ def create_help_command():
             inline=True
         )
 
-        await ctx.send(embed=embed)
+        await send_output(
+            ctx,
+            embed=embed,
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.gif_commands",
+            channel=ctx.channel,
+        )
 
     help_command.__name__ = "commands"
 
