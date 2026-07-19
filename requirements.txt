@@ -1,3 +1,7 @@
 discord.py
 python-dotenv
 aiohttp
+asyncpg
+google-generativeai
+APScheduler
+pytz

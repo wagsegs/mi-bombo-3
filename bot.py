@@ -4,12 +4,18 @@ import logging
 import discord
 from discord.ext import commands
 
-from config import PREFIX, DISCORD_TOKEN
+from config import PREFIX, DISCORD_TOKEN, DATABASE_URL, GEMINI_API_KEY
+
+import database
+from ai import gemini
+import scheduler
 
 COGS = [
     "cogs.gif_commands",
     "cogs.welcome",
-    "cogs.director_notes"
+    "cogs.director_notes",
+    "cogs.message_listener",
+    "progression",
 ]
 
 intents = discord.Intents.default()
@@ -38,6 +44,13 @@ async def on_ready():
         except Exception as e:
             logging.error(f"✗ Failed to load {cog}: {e}")
 
+    # Start scheduler
+    try:
+        scheduler.initialize(bot)
+        await scheduler.start()
+    except Exception as e:
+        logging.error(f"✗ Failed to start scheduler: {e}")
+
     print("🤖 MI BOM3O is online!")
 
 
@@ -45,8 +58,39 @@ async def main():
     if not DISCORD_TOKEN:
         raise RuntimeError("Missing DISCORD_TOKEN in .env")
 
-    async with bot:
-        await bot.start(DISCORD_TOKEN)
+    if not DATABASE_URL:
+        raise RuntimeError("Missing DATABASE_URL in .env")
+
+    if not GEMINI_API_KEY:
+        raise RuntimeError("Missing GEMINI_API_KEY in .env")
+
+    # Initialize systems
+    try:
+        await database.connect(DATABASE_URL)
+        logging.info("✓ Database initialized")
+    except Exception as e:
+        logging.error(f"✗ Failed to initialize database: {e}")
+        return
+
+    try:
+        gemini.initialize(GEMINI_API_KEY)
+        logging.info("✓ Gemini initialized")
+    except Exception as e:
+        logging.error(f"✗ Failed to initialize Gemini: {e}")
+        return
+
+    try:
+        async with bot:
+            await bot.start(DISCORD_TOKEN)
+    finally:
+        try:
+            await scheduler.stop()
+        except Exception as e:
+            logging.error(f"Error stopping scheduler: {e}")
+        try:
+            await database.disconnect()
+        except Exception as e:
+            logging.error(f"Error disconnecting from database: {e}")
 
 
 if __name__ == "__main__":

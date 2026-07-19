@@ -106,3 +106,72 @@ Or bribe the producer.
 DIRECTORS_FOOTER = os.getenv("DIRECTORS_FOOTER", "MI BOMBO Studios")
 DIRECTORS_COLOR = int(os.getenv("DIRECTORS_COLOR", "0x7B61FF"), 16)
 DIRECTORS_MEDIA = os.getenv("DIRECTORS_MEDIA", str(BASE_DIR / "lesgo.gif"))
+
+# ============================================================
+# DATABASE CONFIGURATION
+# ============================================================
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# ============================================================
+# AI CONFIGURATION
+# ============================================================
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# ============================================================
+# SERVER & CHANNELS
+# ============================================================
+SERVER_ID = int(os.getenv("SERVER_ID", "1526652261764173874"))
+CASTING_CHANNEL_ID = int(os.getenv("CASTING_CHANNEL_ID", "1527244160917045278"))
+NEWSPAPER_CHANNEL_ID = int(os.getenv("NEWSPAPER_CHANNEL_ID", "1526652930604662955"))
+WEEKLY_CAST_CHANNEL_ID = int(os.getenv("WEEKLY_CAST_CHANNEL_ID", "1526652930604662955"))
+
+# Channels to exclude from message tracking, screen time, and content generation
+EXCLUDED_TRACKING_CHANNELS = {
+    1527243737883738172,  # Director's Room
+    1527702798655946842,  # heh
+}
+
+# ============================================================
+# PROGRESSION ROLES (Mutually Exclusive)
+# ============================================================
+PROGRESSION_ROLES = [
+    1526865658955038721,  # members
+    1528480740491132948,  # Extra
+    1526874639941242930,  # Guest Star
+    1526874159496429568,  # Supporting Cast
+    1526874354141626368,  # Main Cast
+    1526874419576701058,  # Main Character
+    1528481045094207679,  # Fan Favorite
+    1528481466223427725,  # Scene Stealer
+    1528481587619172555,  # Box Office Legend
+    1526875250313396325,  # Hall of Fame
+]
+
+# Staff roles that are NEVER touched by progression
+STAFF_ROLES = {
+    "Producer": None,
+    "Executive Producer": None,
+    "Director": None,
+}
+
+# Screen Time thresholds for automatic promotion
+SCREEN_TIME_THRESHOLDS = {
+    1526865658955038721: 0,      # members
+    1528480740491132948: 100,    # Extra
+    1526874639941242930: 250,    # Guest Star
+    1526874159496429568: 500,    # Supporting Cast
+    1526874354141626368: 1000,   # Main Cast
+    1526874419576701058: 2000,   # Main Character
+    1528481045094207679: 3500,   # Fan Favorite
+    1528481466223427725: 5500,   # Scene Stealer
+    1528481587619172555: 8000,   # Box Office Legend
+    1526875250313396325: 12000,  # Hall of Fame
+}
+
+# ============================================================
+# SCHEDULER CONFIGURATION
+# ============================================================
+SCHEDULER_TIMEZONE = "Europe/Berlin"
+NEWSPAPER_SCHEDULE = "09:00"  # Daily at 09:00
+WEEKLY_CAST_SCHEDULE = "09:00"  # Sunday at 09:00
+WEEKLY_CAST_DAY = "sun"  # Sunday
