@@ -3,8 +3,49 @@ from typing import List, Dict, Any
 from datetime import datetime, timedelta
 
 import database
+from config import (
+    LORE_MIN_PARTICIPANTS,
+    LORE_MIN_MESSAGES,
+    LORE_MAX_AVERAGE_REPLY_GAP_SECONDS,
+    LORE_MIN_DURATION_SECONDS,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def get_lore_eligibility_reasons(
+    message_count: int,
+    participant_count: int,
+    duration_seconds: int,
+    average_gap_seconds: float,
+) -> List[str]:
+    """Return the reasons a conversation should not be considered for lore."""
+    reasons: List[str] = []
+    if message_count < LORE_MIN_MESSAGES:
+        reasons.append("Not enough messages")
+    if participant_count < LORE_MIN_PARTICIPANTS:
+        reasons.append("Not enough participants")
+    if average_gap_seconds > LORE_MAX_AVERAGE_REPLY_GAP_SECONDS:
+        reasons.append("Conversation too scattered")
+    if duration_seconds < LORE_MIN_DURATION_SECONDS:
+        reasons.append("Conversation too short")
+    return reasons
+
+
+def evaluate_lore_eligibility(
+    message_count: int,
+    participant_count: int,
+    duration_seconds: int,
+    average_gap_seconds: float,
+) -> tuple[bool, List[str]]:
+    """Return whether a conversation is eligible for lore generation and the reasons if not."""
+    reasons = get_lore_eligibility_reasons(
+        message_count=message_count,
+        participant_count=participant_count,
+        duration_seconds=duration_seconds,
+        average_gap_seconds=average_gap_seconds,
+    )
+    return len(reasons) == 0, reasons
 
 
 class ConversationTracker:
@@ -24,7 +65,7 @@ class ConversationTracker:
         channel_id: int,
         timestamp: datetime,
         reply_to: int = None,
-    ) -> None:
+    ) -> 'Conversation':
         """
         Track a message and group it with conversations.
         
@@ -46,8 +87,10 @@ class ConversationTracker:
             if conv_id in self.conversations:
                 conv = self.conversations[conv_id]
                 conv.add_message(message_id, user_id, content, timestamp)
+                return conv
         except Exception as e:
             logger.error(f"Failed to track message {message_id}: {e}")
+        return None
 
     def _find_or_create_conversation(
         self,

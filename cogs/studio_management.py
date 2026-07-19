@@ -15,11 +15,12 @@ from config import (
     STUDIO_PREFIX,
     NEWSPAPER_CHANNEL_ID,
     WEEKLY_CAST_CHANNEL_ID,
-    LORE_MIN_PARTICIPANTS,
-    LORE_MIN_MESSAGES,
-    LORE_MAX_AVERAGE_REPLY_GAP_SECONDS,
-    LORE_MIN_DURATION_SECONDS,
+     LORE_MIN_PARTICIPANTS,
+     LORE_MIN_MESSAGES,
+     LORE_MAX_AVERAGE_REPLY_GAP_SECONDS,
+     LORE_MIN_DURATION_SECONDS,
 )
+import tracking
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class StudioManagementCog(commands.Cog):
         )
         embed.add_field(
             name="📖 Lore",
-            value="• $lorestart — Begin lore recording\n• $lorestop — End lore recording\n• $testlore — Generate a lore test preview",
+            value="• $lorestart — Begin lore recording\n• $lorestop — End lore recording\n• $testlore — Generate a lore test preview\n• $dailies — Review recent tracked conversations",
             inline=False,
         )
         embed.add_field(
@@ -142,6 +143,149 @@ class StudioManagementCog(commands.Cog):
         if not await self._ensure_owner(ctx):
             return
         await ctx.send("Lore generation is available through the manual Studio workflow once eligible conversations are collected.")
+
+    @commands.command(name="dailies")
+    async def dailies(self, ctx: commands.Context, conversation_number: Optional[str] = None):
+        if not await self._ensure_owner(ctx):
+            return
+
+        if conversation_number:
+            try:
+                conv_id = int(conversation_number)
+            except ValueError:
+                await ctx.send("Please provide a valid conversation number.")
+                return
+            detail = await database.get_conversation_detail(conv_id)
+            if not detail:
+                await ctx.send(f"No conversation found with the number {conv_id}.")
+                return
+            await self._send_conversation_detail_embed(ctx, detail)
+            return
+
+        summaries = await database.get_recent_conversation_summaries(limit=5)
+        embed = discord.Embed(
+            title="🎬 Director's Dailies",
+            description="Recent tracked conversations from the studio archive.",
+            color=discord.Color(0x7B61FF),
+        )
+        if not summaries:
+            embed.add_field(name="No Dailies Recorded", value="No tracked conversations have been recorded yet.", inline=False)
+            await ctx.send(embed=embed)
+            return
+
+        for row in summaries:
+            started_at = row.get('started_at')
+            ended_at = row.get('ended_at')
+            duration_seconds = 0
+            if started_at and ended_at:
+                duration_seconds = max(0, int((ended_at - started_at).total_seconds()))
+            message_count = len(row.get('message_ids') or [])
+            participant_count = len(row.get('participant_ids') or [])
+            average_gap_seconds = 0.0
+            messages = []
+            if row.get('message_ids'):
+                try:
+                    message_rows = await database.get_messages_between(started_at, ended_at or started_at)
+                    if message_rows:
+                        message_rows = [msg for msg in message_rows if msg.get('message_id') in (row.get('message_ids') or [])]
+                        messages = sorted(message_rows, key=lambda item: item.get('created_at') or started_at)
+                        timestamps = [msg.get('created_at') for msg in messages if msg.get('created_at')]
+                        timestamps.sort()
+                        if len(timestamps) > 1:
+                            gaps = [(timestamps[idx] - timestamps[idx - 1]).total_seconds() for idx in range(1, len(timestamps))]
+                            average_gap_seconds = sum(gaps) / len(gaps) if gaps else 0
+                except Exception:
+                    average_gap_seconds = 0.0
+            is_eligible, reasons = tracking.evaluate_lore_eligibility(
+                message_count=message_count,
+                participant_count=participant_count,
+                duration_seconds=duration_seconds,
+                average_gap_seconds=average_gap_seconds,
+            )
+            channel_name = row.get('channel_name') or f"Channel {row.get('channel_id') or 'unknown'}"
+            lines = [
+                f"{row.get('id')}.",
+                channel_name,
+                f"{participant_count} participants",
+                f"{message_count} messages",
+                f"Duration: {self._format_duration(duration_seconds)}",
+                f"{'✅ Lore Eligible' if is_eligible else '❌ Not Eligible'}",
+            ]
+            if not is_eligible:
+                lines.append("Reason:")
+                lines.extend(f"• {reason}" for reason in reasons)
+            embed.add_field(name="\u200b", value="\n".join(lines), inline=False)
+
+        await ctx.send(embed=embed)
+
+    async def _send_conversation_detail_embed(self, ctx: commands.Context, detail: dict):
+        started_at = detail.get('started_at')
+        ended_at = detail.get('ended_at')
+        duration_seconds = 0
+        if started_at and ended_at:
+            duration_seconds = max(0, int((ended_at - started_at).total_seconds()))
+        message_count = detail.get('message_count', 0)
+        participants = detail.get('participants') or []
+        message_rows = detail.get('messages') or []
+        is_eligible, reasons = tracking.evaluate_lore_eligibility(
+            message_count=message_count,
+            participant_count=len(participants),
+            duration_seconds=duration_seconds,
+            average_gap_seconds=self._calculate_average_gap(message_rows, started_at),
+        )
+        embed = discord.Embed(
+            title="🎬 Director's Dailies",
+            description=f"Conversation #{detail.get('id')}",
+            color=discord.Color(0x7B61FF),
+        )
+        embed.add_field(name="Channel", value=detail.get('channel_name') or f"Channel {detail.get('channel_id') or 'unknown'}", inline=False)
+        embed.add_field(name="Started", value=self._format_timestamp(started_at), inline=True)
+        embed.add_field(name="Ended", value=self._format_timestamp(ended_at), inline=True)
+        embed.add_field(name="Duration", value=self._format_duration(duration_seconds), inline=True)
+        embed.add_field(name="Participants", value="\n".join(participants) if participants else "No participants recorded", inline=False)
+        embed.add_field(name="Messages", value=str(message_count), inline=True)
+        embed.add_field(name="Lore Eligible", value="✅ Yes" if is_eligible else "❌ No", inline=True)
+        if reasons:
+            embed.add_field(name="Reasons", value="\n".join(f"• {reason}" for reason in reasons), inline=False)
+        transcript = self._build_transcript_preview(message_rows)
+        embed.add_field(name="Transcript Preview", value=transcript, inline=False)
+        await ctx.send(embed=embed)
+
+    def _build_transcript_preview(self, messages: list, limit: int = 30, max_chars: int = 900) -> str:
+        preview_messages = messages[:limit]
+        lines = []
+        for message in preview_messages:
+            username = message.get('username') or 'Unknown'
+            content = message.get('content') or ''
+            lines.append(f"{username}: {content}")
+        if len(messages) > limit:
+            lines.append("... additional messages omitted")
+        preview = "\n".join(lines)
+        if len(preview) > max_chars:
+            preview = preview[:max_chars].rsplit("\n", 1)[0] + "\n... additional messages omitted"
+        return preview or "No transcript available."
+
+    def _calculate_average_gap(self, messages: list, started_at: datetime | None) -> float:
+        timestamps = [msg.get('created_at') for msg in messages if msg.get('created_at')]
+        timestamps.sort()
+        if len(timestamps) > 1:
+            gaps = [(timestamps[idx] - timestamps[idx - 1]).total_seconds() for idx in range(1, len(timestamps))]
+            return sum(gaps) / len(gaps) if gaps else 0.0
+        return 0.0
+
+    def _format_duration(self, seconds: int) -> str:
+        minutes, remainder = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours:
+            return f"{hours}h {minutes}m {remainder}s"
+        if minutes:
+            return f"{minutes}m {remainder}s"
+        return f"{seconds}s"
+
+    def _format_timestamp(self, value: datetime | None) -> str:
+        if not value:
+            return "Unknown"
+        return value.strftime("%I:%M %p")
 
     @commands.command(name="reloadscheduler")
     async def reloadscheduler(self, ctx: commands.Context):

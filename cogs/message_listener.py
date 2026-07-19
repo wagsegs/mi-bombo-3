@@ -83,7 +83,7 @@ class MessageListenerCog(commands.Cog):
 
             # Track in conversation tracker
             tracker = get_tracker()
-            await tracker.track_message(
+            conversation = await tracker.track_message(
                 message_id=message.id,
                 user_id=message.author.id,
                 content=message.content,
@@ -91,6 +91,17 @@ class MessageListenerCog(commands.Cog):
                 timestamp=message.created_at,
                 reply_to=reply_to,
             )
+
+            if conversation is not None:
+                await database.save_conversation_snapshot(
+                    conversation_id=conversation.id,
+                    channel_id=conversation.channel_id,
+                    channel_name=getattr(message.channel, "name", "DM"),
+                    started_at=conversation.started_at,
+                    ended_at=conversation.last_message_time,
+                    message_ids=conversation.message_ids,
+                    participant_ids=list(conversation.participant_ids),
+                )
 
             await self._process_lore_candidates(message, reply_to)
 
@@ -165,13 +176,7 @@ class MessageListenerCog(commands.Cog):
         except (discord.Forbidden, discord.HTTPException):
             recent_messages = [message]
 
-        if len(recent_messages) < LORE_MIN_MESSAGES:
-            return
-
         participant_ids = {msg.author.id for msg in recent_messages if not msg.author.bot}
-        if len(participant_ids) < LORE_MIN_PARTICIPANTS:
-            return
-
         timestamps = [msg.created_at for msg in recent_messages]
         timestamps.sort()
         if len(timestamps) > 1:
@@ -182,12 +187,15 @@ class MessageListenerCog(commands.Cog):
             average_gap = sum(gaps) / len(gaps) if gaps else 0
         else:
             average_gap = 0
-
-        if average_gap > LORE_MAX_AVERAGE_REPLY_GAP_SECONDS:
-            return
-
         duration_seconds = (timestamps[-1] - timestamps[0]).total_seconds() if len(timestamps) > 1 else 0
-        if duration_seconds < LORE_MIN_DURATION_SECONDS:
+
+        is_eligible, reasons = tracking.evaluate_lore_eligibility(
+            message_count=len(recent_messages),
+            participant_count=len(participant_ids),
+            duration_seconds=int(duration_seconds),
+            average_gap_seconds=average_gap,
+        )
+        if not is_eligible:
             return
 
         source_ids = [msg.id for msg in recent_messages if not msg.author.bot]

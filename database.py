@@ -164,11 +164,15 @@ async def initialize_tables() -> None:
                 topic TEXT,
                 message_ids BIGINT[],
                 participant_ids BIGINT[],
+                channel_id BIGINT,
+                channel_name TEXT,
                 started_at TIMESTAMP,
                 ended_at TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        await conn.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS channel_id BIGINT")
+        await conn.execute("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS channel_name TEXT")
 
         logger.info("✓ Database tables initialized")
     except Exception as e:
@@ -232,6 +236,97 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
         return dict(row) if row else None
     except Exception as e:
         logger.error(f"Failed to get user {user_id}: {e}")
+        return None
+    finally:
+        await _pool.release(conn)
+
+
+async def save_conversation_snapshot(
+    conversation_id: int,
+    channel_id: int,
+    channel_name: str,
+    started_at: datetime,
+    ended_at: datetime,
+    message_ids: List[int],
+    participant_ids: List[int],
+) -> None:
+    """Persist a tracked conversation summary to the database."""
+    conn = await _get_connection()
+    try:
+        await conn.execute("""
+            INSERT INTO conversations (
+                id, channel_id, channel_name, message_ids, participant_ids, started_at, ended_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (id) DO UPDATE SET
+                channel_id = EXCLUDED.channel_id,
+                channel_name = EXCLUDED.channel_name,
+                message_ids = EXCLUDED.message_ids,
+                participant_ids = EXCLUDED.participant_ids,
+                started_at = EXCLUDED.started_at,
+                ended_at = EXCLUDED.ended_at
+        """, conversation_id, channel_id, channel_name, message_ids, participant_ids, started_at, ended_at)
+    except Exception as e:
+        logger.error(f"Failed to save conversation snapshot {conversation_id}: {e}")
+    finally:
+        await _pool.release(conn)
+
+
+async def get_recent_conversation_summaries(limit: int = 5) -> List[Dict[str, Any]]:
+    """Return the most recently started conversations from the database."""
+    conn = await _get_connection()
+    try:
+        rows = await conn.fetch("""
+            SELECT id, channel_id, channel_name, started_at, ended_at, message_ids, participant_ids
+            FROM conversations
+            WHERE started_at IS NOT NULL
+            ORDER BY started_at DESC
+            LIMIT $1
+        """, limit)
+        return [dict(row) for row in rows]
+    except Exception as e:
+        logger.error(f"Failed to get recent conversations: {e}")
+        return []
+    finally:
+        await _pool.release(conn)
+
+
+async def get_conversation_detail(conversation_id: int) -> Optional[Dict[str, Any]]:
+    """Return a detailed conversation payload including its stored transcript."""
+    conn = await _get_connection()
+    try:
+        row = await conn.fetchrow("""
+            SELECT id, channel_id, channel_name, started_at, ended_at, message_ids, participant_ids
+            FROM conversations
+            WHERE id = $1
+        """, conversation_id)
+        if not row:
+            return None
+        message_ids = list(row['message_ids'] or [])
+        participant_ids = list(row['participant_ids'] or [])
+        messages = []
+        if message_ids:
+            message_rows = await conn.fetch("""
+                SELECT username, content, created_at
+                FROM messages
+                WHERE message_id = ANY($1::BIGINT[])
+                ORDER BY created_at ASC, message_id ASC
+            """, message_ids)
+            messages = [dict(msg) for msg in message_rows]
+        user_rows = await conn.fetch("""
+            SELECT user_id, username, nickname FROM users WHERE user_id = ANY($1::BIGINT[])
+        """, participant_ids) if participant_ids else []
+        users_by_id = {
+            row['user_id']: row['nickname'] or row['username']
+            for row in user_rows
+        }
+        payload = dict(row)
+        payload['message_count'] = len(message_ids)
+        payload['participant_count'] = len(participant_ids)
+        payload['participants'] = [users_by_id.get(user_id, str(user_id)) for user_id in participant_ids]
+        payload['messages'] = messages
+        return payload
+    except Exception as e:
+        logger.error(f"Failed to get conversation detail {conversation_id}: {e}")
         return None
     finally:
         await _pool.release(conn)

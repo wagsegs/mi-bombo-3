@@ -18,34 +18,34 @@ async def calculate_screen_time_bonuses(
 ) -> int:
     """
     Calculate screen time bonuses modularly.
-    
+
     Args:
         message_length: Length of the message in characters
         conversation_participants: Number of participants in the conversation
         is_reply: Whether the message is a reply
-    
+
     Returns:
         Total screen time earned
     """
     total = 0
-    total += conversation_bonus(message_length)
+    total += base_message_bonus(message_length)
     total += participant_bonus(conversation_participants)
-    total += length_bonus(message_length)
     if is_reply:
-        total += revival_bonus()
+        total += reply_bonus()
     # Future bonuses can be added here:
     # total += future_ai_bonus()
     # total += future_reaction_bonus()
+    # total += future_conversation_momentum_bonus()
     return total
 
 
-def conversation_bonus(message_length: int) -> int:
-    """Bonus for participating in conversations."""
-    if message_length >= 100:
-        return 5
-    elif message_length >= 50:
+def base_message_bonus(message_length: int) -> int:
+    """Reward meaningful participation without double-counting message length."""
+    if message_length >= 250:
         return 3
-    elif message_length >= 10:
+    if message_length >= 100:
+        return 2
+    if message_length >= 10:
         return 1
     return 0
 
@@ -53,28 +53,21 @@ def conversation_bonus(message_length: int) -> int:
 def participant_bonus(num_participants: int) -> int:
     """Bonus for conversations with multiple participants."""
     if num_participants >= 5:
-        return 5
-    elif num_participants >= 3:
-        return 3
-    elif num_participants >= 2:
+        return 1
+    if num_participants >= 3:
+        return 1
+    if num_participants >= 2:
         return 1
     return 0
 
 
-def length_bonus(message_length: int) -> int:
-    """Bonus for longer messages."""
-    if message_length >= 300:
-        return 5
-    elif message_length >= 150:
-        return 3
-    elif message_length >= 50:
-        return 1
-    return 0
+def reply_bonus() -> int:
+    """Small bonus for replying to an active conversation.
 
-
-def revival_bonus() -> int:
-    """Bonus for reviving dead conversations (replying to old messages)."""
-    return 2
+    A true revival bonus should be implemented later when a message restarts an
+    inactive conversation after a configurable amount of time.
+    """
+    return 1
 
 
 def future_ai_bonus() -> int:
@@ -229,16 +222,17 @@ async def create_casting_update_embed(member: discord.Member, new_role: discord.
 
     message = random.choice(messages)
 
-    # Get user's screen time
+    # Get user's progression status for a cinematic promotion update.
     user = await database.get_user(member.id)
     screen_time = user['screen_time'] if user else 0
+    status = get_promotion_status(screen_time, None)
 
     embed = discord.Embed(
         title="🎬 CASTING UPDATE",
         description=message,
         color=new_role.color if new_role.color != discord.Color.default() else discord.Color(0x7B61FF),
     )
-    embed.add_field(name="Screen Time", value=f"{screen_time} points", inline=True)
+    embed.add_field(name="Production Status", value=status, inline=False)
     embed.add_field(name="Role", value=new_role.mention, inline=True)
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.set_footer(text="MI BOMBO Studios | Director's Cast")
