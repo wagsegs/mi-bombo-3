@@ -66,7 +66,7 @@ async def connect(database_url: str) -> None:
         return
 
     try:
-        _pool = await asyncpg.create_pool(database_url, min_size=10, max_size=20)
+        _pool = await asyncpg.create_pool(database_url, min_size=1, max_size=5)
         logger.info("✓ Database connected")
         await _log_pool_state("created")
         await initialize_tables()
