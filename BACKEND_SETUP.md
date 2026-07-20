@@ -4,7 +4,8 @@
 
 ### Core Modules Created
 - ✅ `database.py` - PostgreSQL/Supabase connection & operations
-- ✅ `ai/gemini.py` - Gemini AI integration
+- ✅ `ai/text_provider.py` - Pollinations text integration
+- ✅ `ai/image_provider.py` - Pollinations image integration
 - ✅ `progression.py` - Screen time & promotion system
 - ✅ `tracking.py` - Message tracking & conversation grouping
 - ✅ `scheduler.py` - Scheduled jobs (newspaper, weekly cast)
@@ -42,8 +43,10 @@ PREFIX=.
 # Database (Supabase PostgreSQL)
 DATABASE_URL=postgresql://user:password@host:port/database_name
 
-# Gemini AI
-GEMINI_API_KEY=your_gemini_api_key_here
+# Pollinations AI
+POLLINATIONS_BASE_URL=https://image.pollinations.ai
+POLLINATIONS_TEXT_BASE_URL=https://text.pollinations.ai
+POLLINATIONS_IMAGE_BASE_URL=https://image.pollinations.ai
 
 # Server Config
 SERVER_ID=1526652261764173874
@@ -92,14 +95,14 @@ If yes: Remove old role → Add new role → Post casting update
 ```
 Daily (09:00):
   - Read last 24 hours of messages
-  - Ask Gemini to summarize
+  - Ask the Studio text provider to summarize
   - Generate newspaper image
   - Post to #newspapers
   - Save to database
 
 Weekly (Sunday 09:00):
   - Read last 7 days of messages
-  - Ask Gemini to select 5-7 cast members
+  - Ask the Studio text provider to select 5-7 cast members
   - Generate anime poster (different style each week)
   - Post to #newspapers
   - Save to database
@@ -154,8 +157,8 @@ Before running in production:
    - Ensure DATABASE_URL is correct
    - Check Supabase connection status
 
-2. **Test Gemini Integration**
-   - Verify GEMINI_API_KEY is valid
+2. **Test Pollinations Integration**
+   - Verify Pollinations environment variables are valid
    - Check API quota
 
 3. **Test Bot Permissions**
@@ -181,8 +184,8 @@ Before running in production:
 - Verify PostgreSQL server is running
 - Check connection string format
 
-### "Gemini failed" Error
-- Check GEMINI_API_KEY in .env
+### "Pollinations failed" Error
+- Check Pollinations environment variables in .env
 - Check API quota on Google Cloud
 - Check internet connection
 
@@ -206,7 +209,7 @@ Before running in production:
 - Edit role IDs directly in messages
 - Manually give progression roles with bot permission
 - Disable user mentions in message sends
-- Move Gemini calls outside `ai/gemini.py`
+- Keep provider calls inside `ai/text_provider.py` and `ai/image_provider.py`
 - Scatter database calls throughout cogs
 
 ✅ **DO:**
@@ -214,7 +217,7 @@ Before running in production:
 - Test thoroughly before production
 - Monitor logs for errors
 - Update role thresholds in config.py as needed
-- Keep Gemini prompts updated
+- Keep provider prompts updated
 
 ---
 

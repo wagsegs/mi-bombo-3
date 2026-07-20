@@ -9,7 +9,7 @@ from discord.ext import commands
 import database
 import progression
 import scheduler
-from ai import gemini
+from ai import image_provider, text_provider
 from config import (
     STUDIO_PREFIX,
     NEWSPAPER_CHANNEL_ID,
@@ -176,23 +176,33 @@ class StudioManagementCog(commands.Cog):
                 channel=ctx.channel,
             )
             return
+        
         payload = json.loads(content["payload"])
-        embed = self._build_newspaper_embed(payload)
-        await send_output(
-            channel,
-            embed=embed,
-            message_type=MessageType.NEWSPAPER,
-            module="cogs.studio_management",
-            channel=channel,
-        )
-        await database.mark_studio_content_published("newspaper")
-        await send_output(
-            ctx,
-            content="The newspaper has been published to the studio bulletin.",
-            message_type=MessageType.COMMAND_RESPONSE,
-            module="cogs.studio_management",
-            channel=ctx.channel,
-        )
+        image_path = None
+        try:
+            image_prompt = payload.get("image_prompt")
+            if image_prompt:
+                image_path = await image_provider.generate_image(image_prompt)
+            
+            embed = self._build_newspaper_embed(payload, image_path)
+            await send_output(
+                channel,
+                embed=embed,
+                message_type=MessageType.NEWSPAPER,
+                module="cogs.studio_management",
+                channel=channel,
+            )
+            await database.mark_studio_content_published("newspaper")
+            await send_output(
+                ctx,
+                content="The newspaper has been published to the studio bulletin.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
+        finally:
+            if image_path:
+                image_provider.cleanup_temp_file(image_path)
 
     @commands.command(name="weeklycast")
     async def weeklycast(self, ctx: commands.Context):
@@ -224,23 +234,33 @@ class StudioManagementCog(commands.Cog):
                 channel=ctx.channel,
             )
             return
+        
         payload = json.loads(content["payload"])
-        embed = self._build_weekly_cast_embed(payload)
-        await send_output(
-            channel,
-            embed=embed,
-            message_type=MessageType.WEEKLY_CAST,
-            module="cogs.studio_management",
-            channel=channel,
-        )
-        await database.mark_studio_content_published("weekly_cast")
-        await send_output(
-            ctx,
-            content="The weekly cast has been published to the studio bulletin.",
-            message_type=MessageType.COMMAND_RESPONSE,
-            module="cogs.studio_management",
-            channel=ctx.channel,
-        )
+        image_path = None
+        try:
+            anime_prompt = payload.get("anime_prompt")
+            if anime_prompt:
+                image_path = await image_provider.generate_image(anime_prompt)
+            
+            embed = self._build_weekly_cast_embed(payload, image_path)
+            await send_output(
+                channel,
+                embed=embed,
+                message_type=MessageType.WEEKLY_CAST,
+                module="cogs.studio_management",
+                channel=channel,
+            )
+            await database.mark_studio_content_published("weekly_cast")
+            await send_output(
+                ctx,
+                content="The weekly cast has been published to the studio bulletin.",
+                message_type=MessageType.COMMAND_RESPONSE,
+                module="cogs.studio_management",
+                channel=ctx.channel,
+            )
+        finally:
+            if image_path:
+                image_provider.cleanup_temp_file(image_path)
 
     @commands.command(name="lorestart")
     async def lorestart(self, ctx: commands.Context):
@@ -290,13 +310,92 @@ class StudioManagementCog(commands.Cog):
     async def testlore(self, ctx: commands.Context):
         if not await self._ensure_owner(ctx):
             return
-        await send_output(
+        
+        progress_task = StudioGenerationTask(
             ctx,
-            content="Lore generation is available through the manual Studio workflow once eligible conversations are collected.",
-            message_type=MessageType.COMMAND_RESPONSE,
-            module="cogs.studio_management",
-            channel=ctx.channel,
+            title="🎬 MI BOMBO Studios",
+            description="The Editorial Team is writing a new lore episode...",
+            stages=[
+                "Initializing production...",
+                "Collecting eligible conversations...",
+                "Writing lore episode...",
+                "Generating artwork...",
+                "Finalizing episode...",
+            ],
+            footer="MI BOMBO Studios | Lore Preview",
         )
+        await progress_task.start()
+        image_path = None
+        try:
+            await progress_task.update_stage("Collecting eligible conversations...")
+            recent_conversations = await database.get_recent_conversation_summaries(limit=10)
+            if not recent_conversations:
+                await progress_task.fail("No eligible conversations found for lore generation.")
+                return
+            
+            eligible_messages = []
+            for conv in recent_conversations:
+                started_at = conv.get('started_at')
+                ended_at = conv.get('ended_at')
+                if started_at and ended_at:
+                    messages = await database.get_messages_between(started_at, ended_at)
+                    if messages:
+                        eligible_messages.extend(messages)
+            
+            if not eligible_messages:
+                await progress_task.fail("No messages found in eligible conversations.")
+                return
+
+            await progress_task.update_stage("Writing lore episode...")
+            lore_json = await text_provider.generate_lore_update([
+                {
+                    'username': msg.get('username', 'Unknown'),
+                    'content': msg.get('content', ''),
+                    'created_at': msg.get('created_at'),
+                    'user_id': msg.get('user_id'),
+                }
+                for msg in eligible_messages[:100]
+                if msg.get('content')
+            ])
+            
+            if not lore_json:
+                await progress_task.fail("The studio could not generate a lore episode right now.")
+                return
+            
+            try:
+                data = json.loads(lore_json)
+            except json.JSONDecodeError:
+                await progress_task.fail("The studio received an invalid lore draft.")
+                return
+
+            await progress_task.update_stage("Generating artwork...")
+            image_prompt = data.get("image_prompt")
+            if image_prompt:
+                image_path = await image_provider.generate_image(image_prompt)
+            
+            embed = self._build_lore_embed(data, image_path)
+
+            await progress_task.update_stage("Finalizing episode...")
+            await progress_task.complete(embed)
+        except Exception as exc:
+            logger.exception("Failed to generate lore preview")
+            await progress_task.fail(str(exc) or "Unexpected error")
+        finally:
+            if image_path:
+                image_provider.cleanup_temp_file(image_path)
+
+    def _build_lore_embed(self, data: dict, image_path: Optional[str] = None) -> discord.Embed:
+        embed = discord.Embed(
+            title=f"📖 {data.get('title', 'Lore Episode')}",
+            description=data.get('summary', ''),
+            color=discord.Color(0x7B61FF),
+        )
+        if data.get('lore'):
+            embed.add_field(name='🎭 Episode Lore', value=data.get('lore', ''), inline=False)
+        embed.set_footer(text='MI BOMBO Studios | Lore Preview')
+        if image_path:
+            embed.set_image(file=discord.File(image_path))
+        return embed
 
     @commands.command(name="dailies")
     async def dailies(self, ctx: commands.Context, conversation_number: Optional[str] = None):
@@ -566,6 +665,7 @@ class StudioManagementCog(commands.Cog):
             footer="MI BOMBO Studios | Manual Preview",
         )
         await progress_task.start()
+        image_path = None
         try:
             await progress_task.update_stage("Collecting conversation footage...")
             messages = await database.get_messages_between(start_time, end_time)
@@ -574,7 +674,7 @@ class StudioManagementCog(commands.Cog):
                 return
 
             await progress_task.update_stage("Reviewing today's events...")
-            newspaper_json = await gemini.generate_newspaper_data(messages)
+            newspaper_json = await text_provider.generate_newspaper_data(messages)
             if not newspaper_json:
                 await progress_task.fail("The studio could not generate a newspaper preview right now.")
                 return
@@ -587,14 +687,21 @@ class StudioManagementCog(commands.Cog):
                 return
 
             await progress_task.update_stage("Generating artwork...")
+            image_prompt = data.get("image_prompt")
+            if image_prompt:
+                image_path = await image_provider.generate_image(image_prompt)
+            
             await database.save_studio_content("newspaper", json.dumps(data))
-            embed = self._build_newspaper_embed(data)
+            embed = self._build_newspaper_embed(data, image_path)
 
             await progress_task.update_stage("Finalizing newspaper...")
             await progress_task.complete(embed)
         except Exception as exc:
             logger.exception("Failed to generate newspaper preview")
             await progress_task.fail(str(exc) or "Unexpected error")
+        finally:
+            if image_path:
+                image_provider.cleanup_temp_file(image_path)
 
     async def _generate_and_preview_weekly_cast(self, ctx: commands.Context):
         end_time = utc_now()
@@ -614,6 +721,7 @@ class StudioManagementCog(commands.Cog):
             footer="MI BOMBO Studios | Manual Preview",
         )
         await progress_task.start()
+        image_path = None
         try:
             await progress_task.update_stage("Collecting conversation footage...")
             messages = await database.get_messages_between(start_time, end_time)
@@ -622,7 +730,7 @@ class StudioManagementCog(commands.Cog):
                 return
 
             await progress_task.update_stage("Reviewing this week's highlights...")
-            cast_json = await gemini.generate_weekly_cast_data(messages)
+            cast_json = await text_provider.generate_weekly_cast_data(messages)
             if not cast_json:
                 await progress_task.fail("The studio could not generate a weekly cast preview right now.")
                 return
@@ -635,16 +743,23 @@ class StudioManagementCog(commands.Cog):
                 return
 
             await progress_task.update_stage("Generating artwork...")
+            anime_prompt = data.get("anime_prompt")
+            if anime_prompt:
+                image_path = await image_provider.generate_image(anime_prompt)
+            
             await database.save_studio_content("weekly_cast", json.dumps(data))
-            embed = self._build_weekly_cast_embed(data)
+            embed = self._build_weekly_cast_embed(data, image_path)
 
             await progress_task.update_stage("Finalizing cast...")
             await progress_task.complete(embed)
         except Exception as exc:
             logger.exception("Failed to generate weekly cast preview")
             await progress_task.fail(str(exc) or "Unexpected error")
+        finally:
+            if image_path:
+                image_provider.cleanup_temp_file(image_path)
 
-    def _build_newspaper_embed(self, data: dict) -> discord.Embed:
+    def _build_newspaper_embed(self, data: dict, image_path: Optional[str] = None) -> discord.Embed:
         embed = discord.Embed(
             title=f"📰 {data.get('headline', 'MI BOMBO Daily')}",
             description=data.get('summary', ''),
@@ -657,9 +772,11 @@ class StudioManagementCog(commands.Cog):
         if data.get('cast_candidates'):
             embed.add_field(name='⭐ Cast Candidates', value=data.get('cast_candidates', ''), inline=False)
         embed.set_footer(text='MI BOMBO Studios | Manual Preview')
+        if image_path:
+            embed.set_image(file=discord.File(image_path))
         return embed
 
-    def _build_weekly_cast_embed(self, data: dict) -> discord.Embed:
+    def _build_weekly_cast_embed(self, data: dict, image_path: Optional[str] = None) -> discord.Embed:
         embed = discord.Embed(
             title='🎭 Weekly Cast Preview',
             description=f"Anime Style: **{data.get('anime_style', 'Unknown')}**",
@@ -673,6 +790,8 @@ class StudioManagementCog(commands.Cog):
             )
             embed.add_field(name=f"{member.get('nickname', 'Unknown')}", value=value, inline=False)
         embed.set_footer(text='MI BOMBO Studios | Manual Preview')
+        if image_path:
+            embed.set_image(file=discord.File(image_path))
         return embed
 
 

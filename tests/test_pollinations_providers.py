@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from ai import text_provider
 
 
-def test_generate_text_uses_pollinations_provider(monkeypatch):
+def test_text_provider_uses_pollinations_endpoint(monkeypatch):
     class FakeResponse:
         async def __aenter__(self):
             return self
@@ -19,7 +19,7 @@ def test_generate_text_uses_pollinations_provider(monkeypatch):
             return None
 
         async def text(self):
-            return '{"choices": [{"text": "generated"}]}'
+            return '{"choices": [{"text": "ok"}]}'
 
     class FakeSession:
         async def __aenter__(self):
@@ -28,12 +28,12 @@ def test_generate_text_uses_pollinations_provider(monkeypatch):
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
-        async def post(self, url, json=None, timeout=None):
+        async def post(self, url, json=None):
             return FakeResponse()
 
     monkeypatch.setattr(text_provider.aiohttp, "ClientSession", lambda *args, **kwargs: FakeSession())
-    monkeypatch.setenv("POLLINATIONS_TEXT_BASE_URL", "https://example.test")
+    monkeypatch.setenv("POLLINATIONS_BASE_URL", "https://example.test")
 
-    result = asyncio.run(text_provider.generate_text("hello", system_instruction="be brief"))
+    result = asyncio.run(text_provider.generate_text("hello"))
 
-    assert result == "generated"
+    assert result == "ok"

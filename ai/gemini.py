@@ -1,214 +1,32 @@
 import logging
-import os
 from typing import Optional
-
-from google import genai
-from google.genai import types
-
-from config import AI_CHAT_ENABLED
 
 logger = logging.getLogger(__name__)
 
-_client = None
-_api_key: Optional[str] = None
-
 
 def initialize(api_key: str) -> None:
-    """Initialize Gemini API."""
-    global _client, _api_key
-    try:
-        _api_key = api_key
-        _client = genai.Client(api_key=api_key)
-        logger.info("✓ Gemini API initialized")
-    except Exception as e:
-        logger.error(f"✗ Failed to initialize Gemini API: {e}")
-        raise
-
-
-def _get_client():
-    global _client, _api_key
-    if _client is None:
-        if _api_key:
-            _client = genai.Client(api_key=_api_key)
-        else:
-            _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-    return _client
+    logger.warning("Gemini support has been removed; this module is no longer used")
 
 
 async def generate_text(prompt: str, system_instruction: Optional[str] = None, *, conversational: bool = False) -> Optional[str]:
-    """
-    Generate text using Gemini.
-
-    Args:
-        prompt: The user prompt
-        system_instruction: Optional system instruction for the model
-        conversational: Whether this is an unsolicited conversational reply path
-
-    Returns:
-        Generated text or None if failed
-    """
-    if conversational and not AI_CHAT_ENABLED:
-        logger.warning("Conversational Gemini generation blocked because AI_CHAT_ENABLED is disabled")
-        return None
-    try:
-        client = _get_client()
-        config = None
-        if system_instruction is not None:
-            config = types.GenerateContentConfig(system_instruction=system_instruction)
-
-        kwargs = {
-            "model": "gemini-2.0-flash",
-            "contents": prompt,
-        }
-        if config is not None:
-            kwargs["config"] = config
-
-        response = client.models.generate_content(**kwargs)
-        return response.text
-    except Exception as e:
-        logger.error(f"Failed to generate text: {e}")
-        return None
+    return None
 
 
 async def generate_conversational_reply(prompt: str, system_instruction: Optional[str] = None) -> Optional[str]:
-    """Generate a conversational reply that respects AI_CHAT_ENABLED."""
-    return await generate_text(prompt, system_instruction=system_instruction, conversational=True)
+    return None
 
 
 async def generate_image(prompt: str) -> Optional[str]:
-    """
-    Generate an image using Gemini (currently uses text-to-image).
-    
-    Note: Gemini text models don't generate images directly.
-    This is a placeholder for future image generation integration.
-    You may need to use a separate service like DALL-E or Stable Diffusion.
-    
-    Args:
-        prompt: The image prompt
-    
-    Returns:
-        Image URL or None if failed
-    """
-    try:
-        # Placeholder implementation
-        logger.warning("Image generation not yet implemented. Placeholder used.")
-        return None
-    except Exception as e:
-        logger.error(f"Failed to generate image: {e}")
-        return None
+    return None
 
 
 async def generate_newspaper_data(messages: list) -> Optional[str]:
-    """
-    Generate newspaper data from messages.
-    
-    Args:
-        messages: List of message dictionaries
-    
-    Returns:
-        JSON string with newspaper data or None if failed
-    """
-    message_texts = "\n".join([
-        f"[{msg['created_at']}] {msg['username']}: {msg['content']}"
-        for msg in messages if msg['content']
-    ])
-
-    prompt = f"""Based on these Discord messages from the last 24 hours, create a newspaper summary.
-
-Messages:
-{message_texts}
-
-Return a JSON object with these exact fields:
-{{
-    "headline": "A catchy, movie studio themed headline",
-    "summary": "2-3 sentence overview of today's events",
-    "funniest_moments": "The most hilarious/memorable moments from chat",
-    "lore_updates": "Any interesting story developments or plot points",
-    "cast_candidates": "Notable active members today",
-    "image_prompt": "A 1940s black & white newspaper aesthetic prompt with dramatic headlines and movie studio vibes"
-}}
-
-Make it entertaining and themed around a movie studio called 'MI BOMBO Studios'.
-Return ONLY valid JSON, no markdown or extra text."""
-
-    result = await generate_text(prompt, conversational=False)
-    return result
+    return None
 
 
 async def generate_weekly_cast_data(messages: list) -> Optional[str]:
-    """
-    Generate weekly cast data from messages.
-    
-    Args:
-        messages: List of message dictionaries from the past week
-    
-    Returns:
-        JSON string with cast data or None if failed
-    """
-    message_texts = "\n".join([
-        f"{msg['username']} (@{msg['user_id']}): {msg['content']}"
-        for msg in messages if msg['content']
-    ])
-
-    system_instruction = """Never depict real Discord users as recognizable real people. 
-Create original anime-style fictional characters inspired only by their chat behavior.
-Focus on personality traits, communication style, and presence in conversations."""
-
-    prompt = f"""Based on this week's Discord conversations, select 5-7 standout members.
-
-Messages:
-{message_texts}
-
-For each member, identify:
-- Discord nickname and username
-- Why they were selected (their role/impact)
-- A personality-based character description (e.g., "Chaotic", "Serious", "Sleep-deprived", "Debater", "Gremlin", "Wholesome")
-
-Return a JSON object:
-{{
-    "main_cast": [
-        {{
-            "nickname": "display name",
-            "username": "discord username",
-            "position": "their role (e.g., protagonist, support, comic relief)",
-            "character_description": "personality-based description",
-            "reason": "why they were selected"
-        }}
-    ],
-    "anime_style": "one of: JoJo, Ghibli, Bleach, Cowboy Bebop, Chainsaw Man, Persona, Violet Evergarden",
-    "anime_prompt": "detailed prompt for generating anime poster with these characters, their positions, and personalities"
-}}
-
-Return ONLY valid JSON, no markdown."""
-
-    result = await generate_text(prompt, system_instruction=system_instruction, conversational=False)
-    return result
+    return None
 
 
 async def generate_lore_update(messages: list) -> Optional[str]:
-    """
-    Generate lore updates from messages.
-    
-    Args:
-        messages: List of message dictionaries
-    
-    Returns:
-        Lore update text or None if failed
-    """
-    message_texts = "\n".join([
-        f"{msg['username']}: {msg['content']}"
-        for msg in messages if msg['content']
-    ])
-
-    prompt = f"""Based on these Discord messages, create lore only from memorable community moments for the MI BOMBO Studios universe.
-Ignore personal conversations, life updates, emotional support, private discussions, and one-on-one exchanges.
-Treat the result like an episode of a comedy series: only shared, memorable, public moments become canon.
-Never create lore from people's personal lives.
-
-Messages:
-{message_texts}
-
-Write 2-3 paragraphs capturing the essence of the shared comedy and community energy. Keep it dramatic, cinematic, and clearly built from memorable public moments only."""
-
-    result = await generate_text(prompt, conversational=False)
-    return result
+    return None

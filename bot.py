@@ -4,10 +4,9 @@ import logging
 import discord
 from discord.ext import commands
 
-from config import PREFIX, STUDIO_PREFIX, DISCORD_TOKEN, DATABASE_URL, GEMINI_API_KEY
+from config import PREFIX, STUDIO_PREFIX, DISCORD_TOKEN, DATABASE_URL
 
 import database
-from ai import gemini
 import scheduler
 
 COGS = [
@@ -62,22 +61,12 @@ async def main():
     if not DATABASE_URL:
         raise RuntimeError("Missing DATABASE_URL in .env")
 
-    if not GEMINI_API_KEY:
-        raise RuntimeError("Missing GEMINI_API_KEY in .env")
-
     # Initialize systems
     try:
         await database.connect(DATABASE_URL)
         logging.info("✓ Database initialized")
     except Exception as e:
         logging.error(f"✗ Failed to initialize database: {e}")
-        return
-
-    try:
-        gemini.initialize(GEMINI_API_KEY)
-        logging.info("✓ Gemini initialized")
-    except Exception as e:
-        logging.error(f"✗ Failed to initialize Gemini: {e}")
         return
 
     try:

@@ -53,7 +53,7 @@ def test_newspaper_generation_updates_the_same_progress_message(monkeypatch):
 
     monkeypatch.setattr(studio_management, "send_output", fake_send_output)
     monkeypatch.setattr(studio_management.database, "get_messages_between", fake_get_messages_between)
-    monkeypatch.setattr(studio_management.gemini, "generate_newspaper_data", fake_generate_newspaper_data)
+    monkeypatch.setattr(studio_management.text_provider, "generate_newspaper_data", fake_generate_newspaper_data)
     monkeypatch.setattr(studio_management.database, "save_studio_content", fake_save_studio_content)
 
     asyncio.run(cog._generate_and_preview_newspaper(ctx))

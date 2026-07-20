@@ -8,7 +8,7 @@ from apscheduler.triggers.cron import CronTrigger
 import pytz
 
 import database
-from ai import gemini
+from ai import image_provider, text_provider
 from config import (
     MANUAL_STUDIO_MODE,
     SCHEDULER_TIMEZONE,
@@ -117,8 +117,8 @@ async def _job_newspaper() -> None:
             logger.warning("No messages found for newspaper")
             return
 
-        # Generate newspaper data with Gemini
-        newspaper_json = await gemini.generate_newspaper_data(messages)
+        # Generate newspaper data with the text provider
+        newspaper_json = await text_provider.generate_newspaper_data(messages)
 
         if not newspaper_json:
             logger.error("Failed to generate newspaper data")
@@ -133,7 +133,8 @@ async def _job_newspaper() -> None:
 
         # Generate image
         image_prompt = data.get("image_prompt", "")
-        image_url = await gemini.generate_image(image_prompt)
+        image_path = await image_provider.generate_image(image_prompt)
+        image_url = image_path or ""
 
         # Save to database
         await database.save_newspaper(
@@ -213,8 +214,8 @@ async def _job_weekly_cast() -> None:
             logger.warning("No messages found for weekly cast")
             return
 
-        # Generate cast data with Gemini
-        cast_json = await gemini.generate_weekly_cast_data(messages)
+        # Generate cast data with the text provider
+        cast_json = await text_provider.generate_weekly_cast_data(messages)
 
         if not cast_json:
             logger.error("Failed to generate weekly cast data")
@@ -229,7 +230,8 @@ async def _job_weekly_cast() -> None:
 
         # Generate anime poster
         anime_prompt = data.get("anime_prompt", "")
-        image_url = await gemini.generate_image(anime_prompt)
+        image_path = await image_provider.generate_image(anime_prompt)
+        image_url = image_path or ""
 
         # Save to database
         cast_members = json.dumps(data.get("main_cast", []))

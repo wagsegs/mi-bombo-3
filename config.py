@@ -116,7 +116,13 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # ============================================================
 # AI CONFIGURATION
 # ============================================================
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+IMAGE_PROVIDER = os.getenv("IMAGE_PROVIDER", "pollinations")
+TEXT_PROVIDER = os.getenv("TEXT_PROVIDER", "groq")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+POLLINATIONS_BASE_URL = os.getenv("POLLINATIONS_BASE_URL")
+POLLINATIONS_IMAGE_BASE_URL = os.getenv("POLLINATIONS_IMAGE_BASE_URL")
+POLLINATIONS_TEXT_BASE_URL = os.getenv("POLLINATIONS_TEXT_BASE_URL")
 AI_CHAT_ENABLED = os.getenv("AI_CHAT_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 
 # ============================================================

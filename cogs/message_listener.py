@@ -7,7 +7,7 @@ from discord.ext import commands
 import database
 import progression
 import tracking
-from ai import gemini
+from ai import text_provider
 from utils.output_gateway import MessageType, send_output
 from utils.timezone import utc_now
 from config import (
@@ -240,7 +240,7 @@ class MessageListenerCog(commands.Cog):
         if not source_ids:
             return
 
-        lore_text = await gemini.generate_lore_update([
+        lore_json = await text_provider.generate_lore_update([
             {
                 'username': msg.author.name,
                 'content': msg.content,
@@ -251,7 +251,13 @@ class MessageListenerCog(commands.Cog):
             if not msg.author.bot
         ])
 
-        if lore_text:
+        if lore_json:
+            try:
+                import json
+                lore_data = json.loads(lore_json)
+                lore_text = lore_data.get('lore', lore_json)
+            except (json.JSONDecodeError, KeyError):
+                lore_text = lore_json
             await database.save_lore(lore_text, source_ids)
 
     @commands.command(name="screentime", aliases=["st"])
