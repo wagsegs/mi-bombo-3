@@ -18,19 +18,20 @@ def initialize(api_key: str) -> None:
         raise
 
 
-async def generate_text(prompt: str, system_instruction: Optional[str] = None) -> Optional[str]:
+async def generate_text(prompt: str, system_instruction: Optional[str] = None, *, conversational: bool = False) -> Optional[str]:
     """
     Generate text using Gemini.
-    
+
     Args:
         prompt: The user prompt
         system_instruction: Optional system instruction for the model
-    
+        conversational: Whether this is an unsolicited conversational reply path
+
     Returns:
         Generated text or None if failed
     """
-    if not AI_CHAT_ENABLED:
-        logger.warning("Gemini generation blocked because AI_CHAT_ENABLED is disabled")
+    if conversational and not AI_CHAT_ENABLED:
+        logger.warning("Conversational Gemini generation blocked because AI_CHAT_ENABLED is disabled")
         return None
     try:
         model = genai.GenerativeModel(
@@ -42,6 +43,11 @@ async def generate_text(prompt: str, system_instruction: Optional[str] = None) -
     except Exception as e:
         logger.error(f"Failed to generate text: {e}")
         return None
+
+
+async def generate_conversational_reply(prompt: str, system_instruction: Optional[str] = None) -> Optional[str]:
+    """Generate a conversational reply that respects AI_CHAT_ENABLED."""
+    return await generate_text(prompt, system_instruction=system_instruction, conversational=True)
 
 
 async def generate_image(prompt: str) -> Optional[str]:
@@ -100,7 +106,7 @@ Return a JSON object with these exact fields:
 Make it entertaining and themed around a movie studio called 'MI BOMBO Studios'.
 Return ONLY valid JSON, no markdown or extra text."""
 
-    result = await generate_text(prompt)
+    result = await generate_text(prompt, conversational=False)
     return result
 
 
@@ -150,7 +156,7 @@ Return a JSON object:
 
 Return ONLY valid JSON, no markdown."""
 
-    result = await generate_text(prompt, system_instruction=system_instruction)
+    result = await generate_text(prompt, system_instruction=system_instruction, conversational=False)
     return result
 
 
@@ -179,5 +185,5 @@ Messages:
 
 Write 2-3 paragraphs capturing the essence of the shared comedy and community energy. Keep it dramatic, cinematic, and clearly built from memorable public moments only."""
 
-    result = await generate_text(prompt)
+    result = await generate_text(prompt, conversational=False)
     return result

@@ -11,7 +11,6 @@ from ai import gemini
 from utils.output_gateway import MessageType, send_output
 from utils.timezone import utc_now
 from config import (
-    AI_CHAT_ENABLED,
     EXCLUDED_TRACKING_CHANNELS,
     PREFIX,
     STUDIO_PREFIX,
@@ -241,20 +240,19 @@ class MessageListenerCog(commands.Cog):
         if not source_ids:
             return
 
-        if AI_CHAT_ENABLED:
-            lore_text = await gemini.generate_lore_update([
-                {
-                    'username': msg.author.name,
-                    'content': msg.content,
-                    'created_at': msg.created_at,
-                    'user_id': msg.author.id,
-                }
-                for msg in recent_messages
-                if not msg.author.bot
-            ])
+        lore_text = await gemini.generate_lore_update([
+            {
+                'username': msg.author.name,
+                'content': msg.content,
+                'created_at': msg.created_at,
+                'user_id': msg.author.id,
+            }
+            for msg in recent_messages
+            if not msg.author.bot
+        ])
 
-            if lore_text:
-                await database.save_lore(lore_text, source_ids)
+        if lore_text:
+            await database.save_lore(lore_text, source_ids)
 
     @commands.command(name="screentime", aliases=["st"])
     async def check_screen_time(self, ctx: commands.Context, member: discord.Member = None):

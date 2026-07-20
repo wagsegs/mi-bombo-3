@@ -2,8 +2,6 @@ import logging
 from enum import Enum
 from typing import Optional, Any
 
-from config import AI_CHAT_ENABLED
-
 logger = logging.getLogger(__name__)
 
 
@@ -48,14 +46,6 @@ async def send_output(
             module,
             getattr(channel or destination, "id", None),
         )
-        return None
-
-    if not AI_CHAT_ENABLED and normalized_type in {
-        MessageType.NEWSPAPER,
-        MessageType.WEEKLY_CAST,
-        MessageType.LORE,
-    }:
-        logger.info("Blocked outgoing message because AI chat is disabled. Module: %s", module)
         return None
 
     try:
