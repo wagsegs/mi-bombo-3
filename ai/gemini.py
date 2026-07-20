@@ -1,21 +1,38 @@
 import logging
+import os
 from typing import Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from config import AI_CHAT_ENABLED
 
 logger = logging.getLogger(__name__)
 
+_client = None
+_api_key: Optional[str] = None
+
 
 def initialize(api_key: str) -> None:
     """Initialize Gemini API."""
+    global _client, _api_key
     try:
-        genai.configure(api_key=api_key)
+        _api_key = api_key
+        _client = genai.Client(api_key=api_key)
         logger.info("✓ Gemini API initialized")
     except Exception as e:
         logger.error(f"✗ Failed to initialize Gemini API: {e}")
         raise
+
+
+def _get_client():
+    global _client, _api_key
+    if _client is None:
+        if _api_key:
+            _client = genai.Client(api_key=_api_key)
+        else:
+            _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    return _client
 
 
 async def generate_text(prompt: str, system_instruction: Optional[str] = None, *, conversational: bool = False) -> Optional[str]:
@@ -34,11 +51,19 @@ async def generate_text(prompt: str, system_instruction: Optional[str] = None, *
         logger.warning("Conversational Gemini generation blocked because AI_CHAT_ENABLED is disabled")
         return None
     try:
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=system_instruction
-        )
-        response = model.generate_content(prompt)
+        client = _get_client()
+        config = None
+        if system_instruction is not None:
+            config = types.GenerateContentConfig(system_instruction=system_instruction)
+
+        kwargs = {
+            "model": "gemini-2.0-flash",
+            "contents": prompt,
+        }
+        if config is not None:
+            kwargs["config"] = config
+
+        response = client.models.generate_content(**kwargs)
         return response.text
     except Exception as e:
         logger.error(f"Failed to generate text: {e}")
