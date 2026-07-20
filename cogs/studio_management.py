@@ -11,19 +11,88 @@ import progression
 import scheduler
 from ai import gemini
 from config import (
-    MANUAL_STUDIO_MODE,
     STUDIO_PREFIX,
     NEWSPAPER_CHANNEL_ID,
     WEEKLY_CAST_CHANNEL_ID,
-     LORE_MIN_PARTICIPANTS,
-     LORE_MIN_MESSAGES,
-     LORE_MAX_AVERAGE_REPLY_GAP_SECONDS,
-     LORE_MIN_DURATION_SECONDS,
+    LORE_MIN_PARTICIPANTS,
+    LORE_MIN_MESSAGES,
+    LORE_MAX_AVERAGE_REPLY_GAP_SECONDS,
+    LORE_MIN_DURATION_SECONDS,
 )
 import tracking
 from utils.output_gateway import MessageType, send_output
+from utils.timezone import utc_now
 
 logger = logging.getLogger(__name__)
+
+
+class StudioGenerationTask:
+    def __init__(self, ctx: commands.Context, *, title: str, description: str, stages: list[str], footer: Optional[str] = None):
+        self.ctx = ctx
+        self.title = title
+        self.description = description
+        self.stages = list(stages)
+        self.footer = footer or "MI BOMBO Studios"
+        self.message = None
+        self.current_stage_index = 0
+
+    async def start(self):
+        self.message = await send_output(
+            self.ctx,
+            embed=self._build_embed(),
+            message_type=MessageType.COMMAND_RESPONSE,
+            module="cogs.studio_management",
+            channel=self.ctx.channel,
+        )
+        return self.message
+
+    async def update_stage(self, stage_name: str):
+        if self.message is None:
+            await self.start()
+        if stage_name in self.stages:
+            self.current_stage_index = self.stages.index(stage_name)
+        else:
+            self.stages.append(stage_name)
+            self.current_stage_index = len(self.stages) - 1
+        return await self._refresh()
+
+    async def complete(self, embed: discord.Embed):
+        if self.message is None:
+            return None
+        if hasattr(self.message, "edit"):
+            return await self.message.edit(embed=embed)
+        return None
+
+    async def fail(self, error: str):
+        embed = discord.Embed(
+            title="❌ Production Failed",
+            description="The Editorial Team was unable to finish today's edition.",
+            color=discord.Color(0xED4245),
+        )
+        embed.add_field(name="Reason", value=error or "Unknown error", inline=False)
+        embed.add_field(name="Status", value="Nothing has been published.", inline=False)
+        embed.set_footer(text=self.footer)
+        return await self.complete(embed)
+
+    async def _refresh(self):
+        if self.message is None:
+            return None
+        if hasattr(self.message, "edit"):
+            return await self.message.edit(embed=self._build_embed())
+        return None
+
+    def _build_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title=self.title,
+            description=self.description,
+            color=discord.Color(0x7B61FF),
+        )
+        embed.add_field(name="⏳ Status", value="The production pipeline is actively running.", inline=False)
+        for index, stage in enumerate(self.stages):
+            prefix = "✅" if index < self.current_stage_index else "🔄" if index == self.current_stage_index else "⏳"
+            embed.add_field(name=f"{prefix} {stage}", value="\u200b", inline=False)
+        embed.set_footer(text=self.footer)
+        return embed
 
 
 class StudioManagementCog(commands.Cog):
@@ -81,16 +150,7 @@ class StudioManagementCog(commands.Cog):
     async def news(self, ctx: commands.Context):
         if not await self._ensure_owner(ctx):
             return
-        if MANUAL_STUDIO_MODE:
-            await self._generate_and_preview_newspaper(ctx)
-            return
-        await send_output(
-            ctx,
-            content="Automatic Studio publishing is currently disabled in manual mode.",
-            message_type=MessageType.COMMAND_RESPONSE,
-            module="cogs.studio_management",
-            channel=ctx.channel,
-        )
+        await self._generate_and_preview_newspaper(ctx)
 
     @commands.command(name="publishnews")
     async def publishnews(self, ctx: commands.Context):
@@ -138,16 +198,7 @@ class StudioManagementCog(commands.Cog):
     async def weeklycast(self, ctx: commands.Context):
         if not await self._ensure_owner(ctx):
             return
-        if MANUAL_STUDIO_MODE:
-            await self._generate_and_preview_weekly_cast(ctx)
-            return
-        await send_output(
-            ctx,
-            content="Automatic Studio publishing is currently disabled in manual mode.",
-            message_type=MessageType.COMMAND_RESPONSE,
-            module="cogs.studio_management",
-            channel=ctx.channel,
-        )
+        await self._generate_and_preview_weekly_cast(ctx)
 
     @commands.command(name="publishcast")
     async def publishcast(self, ctx: commands.Context):
@@ -500,90 +551,98 @@ class StudioManagementCog(commands.Cog):
     async def _generate_and_preview_newspaper(self, ctx: commands.Context):
         end_time = utc_now()
         start_time = end_time - timedelta(hours=24)
-        messages = await database.get_messages_between(start_time, end_time)
-        if not messages:
-            await send_output(
-                ctx,
-                content="No recent messages were found for a newspaper preview.",
-                message_type=MessageType.COMMAND_RESPONSE,
-                module="cogs.studio_management",
-                channel=ctx.channel,
-            )
-            return
-        newspaper_json = await gemini.generate_newspaper_data(messages)
-        if not newspaper_json:
-            await send_output(
-                ctx,
-                content="The studio could not generate a newspaper preview right now.",
-                message_type=MessageType.COMMAND_RESPONSE,
-                module="cogs.studio_management",
-                channel=ctx.channel,
-            )
-            return
-        try:
-            data = json.loads(newspaper_json)
-        except json.JSONDecodeError:
-            await send_output(
-                ctx,
-                content="The studio received an invalid newspaper draft.",
-                message_type=MessageType.COMMAND_RESPONSE,
-                module="cogs.studio_management",
-                channel=ctx.channel,
-            )
-            return
-        await database.save_studio_content("newspaper", json.dumps(data))
-        embed = self._build_newspaper_embed(data)
-        await send_output(
+        progress_task = StudioGenerationTask(
             ctx,
-            embed=embed,
-            message_type=MessageType.COMMAND_RESPONSE,
-            module="cogs.studio_management",
-            channel=ctx.channel,
+            title="🎬 MI BOMBO Studios",
+            description="The Editorial Team has entered the newsroom...\n\nPreparing today's edition of the MI BOMBO Times.",
+            stages=[
+                "Initializing production...",
+                "Collecting conversation footage...",
+                "Reviewing today's events...",
+                "Writing today's edition...",
+                "Generating artwork...",
+                "Finalizing newspaper...",
+            ],
+            footer="MI BOMBO Studios | Manual Preview",
         )
+        await progress_task.start()
+        try:
+            await progress_task.update_stage("Collecting conversation footage...")
+            messages = await database.get_messages_between(start_time, end_time)
+            if not messages:
+                await progress_task.fail("No recent messages were found for a newspaper preview.")
+                return
+
+            await progress_task.update_stage("Reviewing today's events...")
+            newspaper_json = await gemini.generate_newspaper_data(messages)
+            if not newspaper_json:
+                await progress_task.fail("The studio could not generate a newspaper preview right now.")
+                return
+
+            await progress_task.update_stage("Writing today's edition...")
+            try:
+                data = json.loads(newspaper_json)
+            except json.JSONDecodeError:
+                await progress_task.fail("The studio received an invalid newspaper draft.")
+                return
+
+            await progress_task.update_stage("Generating artwork...")
+            await database.save_studio_content("newspaper", json.dumps(data))
+            embed = self._build_newspaper_embed(data)
+
+            await progress_task.update_stage("Finalizing newspaper...")
+            await progress_task.complete(embed)
+        except Exception as exc:
+            logger.exception("Failed to generate newspaper preview")
+            await progress_task.fail(str(exc) or "Unexpected error")
 
     async def _generate_and_preview_weekly_cast(self, ctx: commands.Context):
         end_time = utc_now()
         start_time = end_time - timedelta(days=7)
-        messages = await database.get_messages_between(start_time, end_time)
-        if not messages:
-            await send_output(
-                ctx,
-                content="No recent messages were found for a weekly cast preview.",
-                message_type=MessageType.COMMAND_RESPONSE,
-                module="cogs.studio_management",
-                channel=ctx.channel,
-            )
-            return
-        cast_json = await gemini.generate_weekly_cast_data(messages)
-        if not cast_json:
-            await send_output(
-                ctx,
-                content="The studio could not generate a weekly cast preview right now.",
-                message_type=MessageType.COMMAND_RESPONSE,
-                module="cogs.studio_management",
-                channel=ctx.channel,
-            )
-            return
-        try:
-            data = json.loads(cast_json)
-        except json.JSONDecodeError:
-            await send_output(
-                ctx,
-                content="The studio received an invalid weekly cast draft.",
-                message_type=MessageType.COMMAND_RESPONSE,
-                module="cogs.studio_management",
-                channel=ctx.channel,
-            )
-            return
-        await database.save_studio_content("weekly_cast", json.dumps(data))
-        embed = self._build_weekly_cast_embed(data)
-        await send_output(
+        progress_task = StudioGenerationTask(
             ctx,
-            embed=embed,
-            message_type=MessageType.COMMAND_RESPONSE,
-            module="cogs.studio_management",
-            channel=ctx.channel,
+            title="🎬 MI BOMBO Studios",
+            description="The Editorial Team is assembling this week's spotlight cast...",
+            stages=[
+                "Initializing production...",
+                "Collecting conversation footage...",
+                "Reviewing this week's highlights...",
+                "Writing this week's cast...",
+                "Generating artwork...",
+                "Finalizing cast...",
+            ],
+            footer="MI BOMBO Studios | Manual Preview",
         )
+        await progress_task.start()
+        try:
+            await progress_task.update_stage("Collecting conversation footage...")
+            messages = await database.get_messages_between(start_time, end_time)
+            if not messages:
+                await progress_task.fail("No recent messages were found for a weekly cast preview.")
+                return
+
+            await progress_task.update_stage("Reviewing this week's highlights...")
+            cast_json = await gemini.generate_weekly_cast_data(messages)
+            if not cast_json:
+                await progress_task.fail("The studio could not generate a weekly cast preview right now.")
+                return
+
+            await progress_task.update_stage("Writing this week's cast...")
+            try:
+                data = json.loads(cast_json)
+            except json.JSONDecodeError:
+                await progress_task.fail("The studio received an invalid weekly cast draft.")
+                return
+
+            await progress_task.update_stage("Generating artwork...")
+            await database.save_studio_content("weekly_cast", json.dumps(data))
+            embed = self._build_weekly_cast_embed(data)
+
+            await progress_task.update_stage("Finalizing cast...")
+            await progress_task.complete(embed)
+        except Exception as exc:
+            logger.exception("Failed to generate weekly cast preview")
+            await progress_task.fail(str(exc) or "Unexpected error")
 
     def _build_newspaper_embed(self, data: dict) -> discord.Embed:
         embed = discord.Embed(
