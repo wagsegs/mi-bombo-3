@@ -11,6 +11,44 @@ logger = logging.getLogger(__name__)
 _pool: Optional[asyncpg.Pool] = None
 
 
+async def _log_pool_state(action: str) -> None:
+    """Emit lightweight pool lifecycle logging when supported by asyncpg."""
+    if not _pool:
+        logger.info("Database pool %s: no active pool", action)
+        return
+
+    try:
+        pool_size = getattr(_pool, "get_size", None)
+        if callable(pool_size):
+            pool_size = pool_size()
+        else:
+            pool_size = getattr(_pool, "min_size", None)
+
+        max_size = getattr(_pool, "get_max_size", None)
+        if callable(max_size):
+            max_size = max_size()
+        else:
+            max_size = getattr(_pool, "max_size", None)
+
+        in_use = None
+        holders = getattr(_pool, "_holders", None)
+        if holders is not None:
+            try:
+                in_use = len(holders)
+            except Exception:
+                in_use = None
+
+        logger.info(
+            "Database pool %s: size=%s max=%s connections_in_use=%s",
+            action,
+            pool_size if pool_size is not None else "unknown",
+            max_size if max_size is not None else "unknown",
+            in_use if in_use is not None else "unknown",
+        )
+    except Exception:
+        logger.info("Database pool %s: state unavailable", action)
+
+
 def _normalize_timestamp_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Ensure timestamp fields are timezone-aware UTC datetimes when used in Python."""
     normalized = dict(payload)
@@ -21,11 +59,16 @@ def _normalize_timestamp_fields(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 async def connect(database_url: str) -> None:
-    """Initialize connection pool to PostgreSQL database."""
+    """Initialize connection pool to PostgreSQL database once and reuse it."""
     global _pool
+    if _pool is not None:
+        logger.info("Database pool already initialized; reusing existing pool")
+        return
+
     try:
         _pool = await asyncpg.create_pool(database_url, min_size=10, max_size=20)
         logger.info("✓ Database connected")
+        await _log_pool_state("created")
         await initialize_tables()
     except Exception as e:
         logger.error(f"✗ Failed to connect to database: {e}")
@@ -33,19 +76,31 @@ async def connect(database_url: str) -> None:
 
 
 async def disconnect() -> None:
-    """Close database connection pool."""
+    """Close database connection pool gracefully."""
     global _pool
     if _pool:
-        await _pool.close()
+        pool = _pool
+        await _log_pool_state("closing")
         _pool = None
+        await pool.close()
         logger.info("✓ Database disconnected")
 
 
 async def _get_connection():
-    """Get a connection from the pool."""
+    """Get a connection from the shared pool."""
     if not _pool:
         raise RuntimeError("Database not connected. Call connect() first.")
     return await _pool.acquire()
+
+
+async def _release_connection(conn: Any) -> None:
+    """Release a connection back to the shared pool if it is still owned by the pool."""
+    if not _pool:
+        return
+    try:
+        await _pool.release(conn)
+    except Exception:
+        logger.warning("Failed to release database connection back to the pool")
 
 
 async def initialize_tables() -> None:
@@ -190,7 +245,7 @@ async def initialize_tables() -> None:
         logger.error(f"✗ Failed to initialize tables: {e}")
         raise
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def save_message(
@@ -218,7 +273,7 @@ async def save_message(
     except Exception as e:
         logger.error(f"Failed to save message {message_id}: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_or_create_user(user_id: int, username: str, nickname: Optional[str] = None) -> None:
@@ -234,7 +289,7 @@ async def get_or_create_user(user_id: int, username: str, nickname: Optional[str
     except Exception as e:
         logger.error(f"Failed to create/update user {user_id}: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
@@ -249,7 +304,7 @@ async def get_user(user_id: int) -> Optional[Dict[str, Any]]:
         logger.error(f"Failed to get user {user_id}: {e}")
         return None
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def save_conversation_snapshot(
@@ -280,7 +335,7 @@ async def save_conversation_snapshot(
     except Exception as e:
         logger.error(f"Failed to save conversation snapshot {conversation_id}: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_recent_conversation_summaries(limit: int = 5) -> List[Dict[str, Any]]:
@@ -299,7 +354,7 @@ async def get_recent_conversation_summaries(limit: int = 5) -> List[Dict[str, An
         logger.error(f"Failed to get recent conversations: {e}")
         return []
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_conversation_detail(conversation_id: int) -> Optional[Dict[str, Any]]:
@@ -341,7 +396,7 @@ async def get_conversation_detail(conversation_id: int) -> Optional[Dict[str, An
         logger.error(f"Failed to get conversation detail {conversation_id}: {e}")
         return None
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def update_screen_time(user_id: int, amount: int, reason: str = "conversation") -> int:
@@ -372,7 +427,7 @@ async def update_screen_time(user_id: int, amount: int, reason: str = "conversat
         logger.error(f"Failed to update screen time for user {user_id}: {e}")
         return 0
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def promote_user(user_id: int, from_role_id: Optional[int], to_role_id: int) -> None:
@@ -397,7 +452,7 @@ async def promote_user(user_id: int, from_role_id: Optional[int], to_role_id: in
     except Exception as e:
         logger.error(f"Failed to record promotion for user {user_id}: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_messages_between(start_time: datetime, end_time: datetime) -> List[Dict[str, Any]]:
@@ -414,7 +469,7 @@ async def get_messages_between(start_time: datetime, end_time: datetime) -> List
         logger.error(f"Failed to get messages: {e}")
         return []
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def save_newspaper(
@@ -438,7 +493,7 @@ async def save_newspaper(
     except Exception as e:
         logger.error(f"Failed to save newspaper: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def save_lore(content: str, source_messages: List[int]) -> None:
@@ -452,7 +507,7 @@ async def save_lore(content: str, source_messages: List[int]) -> None:
     except Exception as e:
         logger.error(f"Failed to save lore: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def start_lore_session(guild_id: int, channel_id: int, started_by: int) -> bool:
@@ -476,7 +531,7 @@ async def start_lore_session(guild_id: int, channel_id: int, started_by: int) ->
         logger.error(f"Failed to start lore session: {e}")
         return False
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def stop_lore_session(guild_id: int) -> bool:
@@ -492,7 +547,7 @@ async def stop_lore_session(guild_id: int) -> bool:
         logger.error(f"Failed to stop lore session: {e}")
         return False
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_active_lore_session(guild_id: int) -> Optional[Dict[str, Any]]:
@@ -508,7 +563,7 @@ async def get_active_lore_session(guild_id: int) -> Optional[Dict[str, Any]]:
         logger.error(f"Failed to fetch lore session: {e}")
         return None
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def save_studio_content(content_type: str, payload: str) -> None:
@@ -523,7 +578,7 @@ async def save_studio_content(content_type: str, payload: str) -> None:
     except Exception as e:
         logger.error(f"Failed to save studio content: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_latest_studio_content(content_type: str) -> Optional[Dict[str, Any]]:
@@ -539,7 +594,7 @@ async def get_latest_studio_content(content_type: str) -> Optional[Dict[str, Any
         logger.error(f"Failed to fetch studio content: {e}")
         return None
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def mark_studio_content_published(content_type: str) -> None:
@@ -553,7 +608,7 @@ async def mark_studio_content_published(content_type: str) -> None:
     except Exception as e:
         logger.error(f"Failed to mark studio content as published: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def save_weekly_cast(
@@ -572,7 +627,7 @@ async def save_weekly_cast(
     except Exception as e:
         logger.error(f"Failed to save weekly cast: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_users_by_screen_time_threshold(threshold: int) -> List[Dict[str, Any]]:
@@ -588,7 +643,7 @@ async def get_users_by_screen_time_threshold(threshold: int) -> List[Dict[str, A
         logger.error(f"Failed to get users by threshold: {e}")
         return []
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def reset_user_screen_time(user_id: int) -> int:
@@ -604,7 +659,7 @@ async def reset_user_screen_time(user_id: int) -> int:
         logger.error(f"Failed to reset screen time for user {user_id}: {e}")
         return 0
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def set_user_role(user_id: int, role_id: Optional[int]) -> None:
@@ -619,7 +674,7 @@ async def set_user_role(user_id: int, role_id: Optional[int]) -> None:
     except Exception as e:
         logger.error(f"Failed to set role for user {user_id}: {e}")
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_user_promotion_history(user_id: int) -> List[Dict[str, Any]]:
@@ -635,7 +690,7 @@ async def get_user_promotion_history(user_id: int) -> List[Dict[str, Any]]:
         logger.error(f"Failed to get promotion history: {e}")
         return []
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_weekly_cast_appearances(user_id: int) -> List[str]:
@@ -653,7 +708,7 @@ async def get_weekly_cast_appearances(user_id: int) -> List[str]:
         logger.error(f"Failed to get weekly cast appearances: {e}")
         return []
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
 
 
 async def get_newspaper_features(user_id: int) -> List[str]:
@@ -671,4 +726,4 @@ async def get_newspaper_features(user_id: int) -> List[str]:
         logger.error(f"Failed to get newspaper features: {e}")
         return []
     finally:
-        await _pool.release(conn)
+        await _release_connection(conn)
