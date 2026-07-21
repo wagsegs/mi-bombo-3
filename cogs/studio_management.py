@@ -20,6 +20,7 @@ from config import (
     LORE_MIN_DURATION_SECONDS,
 )
 import tracking
+from utils import studio_editor_pipeline
 from utils.output_gateway import MessageType, send_output
 from utils.timezone import utc_now
 
@@ -665,13 +666,18 @@ class StudioManagementCog(commands.Cog):
         image_path = None
         try:
             await progress_task.update_stage("Collecting conversation footage...")
-            messages = await database.get_messages_between(start_time, end_time)
-            if not messages:
-                await progress_task.fail("No recent messages were found for a newspaper preview.")
+            conversations = await studio_editor_pipeline.get_eligible_conversations(start_time, end_time)
+            if not conversations:
+                await progress_task.fail("No eligible conversations were found for a newspaper preview.")
                 return
 
             await progress_task.update_stage("Reviewing today's events...")
-            newspaper_json = await text_provider.generate_newspaper_data(messages)
+            conversation_summaries = await studio_editor_pipeline.summarize_conversations(conversations)
+            if not conversation_summaries:
+                await progress_task.fail("No eligible conversation summaries could be generated for a newspaper preview.")
+                return
+
+            newspaper_json = await studio_editor_pipeline.generate_final_newspaper_json(conversation_summaries)
             if not newspaper_json:
                 await progress_task.fail("The studio could not generate a newspaper preview right now.")
                 return

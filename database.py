@@ -357,6 +357,25 @@ async def get_recent_conversation_summaries(limit: int = 5) -> List[Dict[str, An
         await _release_connection(conn)
 
 
+async def get_conversation_summaries_between(start_time: datetime, end_time: datetime, limit: int = 50) -> List[Dict[str, Any]]:
+    """Return conversation summaries that overlap a time range."""
+    conn = await _get_connection()
+    try:
+        rows = await conn.fetch("""
+            SELECT id, channel_id, channel_name, started_at, ended_at, message_ids, participant_ids
+            FROM conversations
+            WHERE ended_at >= $1 AND started_at <= $2
+            ORDER BY ended_at DESC
+            LIMIT $3
+        """, to_db_timestamp(start_time), to_db_timestamp(end_time), limit)
+        return [_normalize_timestamp_fields(dict(row)) for row in rows]
+    except Exception as e:
+        logger.error(f"Failed to get conversation summaries between {start_time} and {end_time}: {e}")
+        return []
+    finally:
+        await _release_connection(conn)
+
+
 async def get_conversation_detail(conversation_id: int) -> Optional[Dict[str, Any]]:
     """Return a detailed conversation payload including its stored transcript."""
     conn = await _get_connection()

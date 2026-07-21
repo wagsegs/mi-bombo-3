@@ -42,18 +42,47 @@ def test_newspaper_generation_updates_the_same_progress_message(monkeypatch):
             return progress_message
         return None
 
-    async def fake_get_messages_between(*args, **kwargs):
-        return [{"username": "Alice", "content": "hello", "created_at": None, "user_id": 1}]
+    async def fake_get_eligible_conversations(*args, **kwargs):
+        return [
+            {
+                "id": 1,
+                "channel_name": "general",
+                "started_at": None,
+                "ended_at": None,
+                "message_ids": [1],
+                "participant_ids": [1],
+                "messages": [
+                    {"username": "Alice", "content": "hello", "created_at": None, "user_id": 1}
+                ],
+            }
+        ]
 
-    async def fake_generate_newspaper_data(*args, **kwargs):
+    async def fake_summarize_conversations(*args, **kwargs):
+        return [
+            {
+                "conversation_id": 1,
+                "conversation_summary": {
+                    "events": [],
+                    "running_jokes": [],
+                    "important_quotes": [],
+                    "main_characters": [],
+                    "lore": [],
+                    "importance": 0,
+                },
+                "chunks": [],
+            }
+        ]
+
+    async def fake_generate_final_newspaper_json(*args, **kwargs):
         return json.dumps({"headline": "Daily", "summary": "ok", "funniest_moments": "", "lore_updates": "", "cast_candidates": ""})
 
     async def fake_save_studio_content(*args, **kwargs):
         return None
 
     monkeypatch.setattr(studio_management, "send_output", fake_send_output)
-    monkeypatch.setattr(studio_management.database, "get_messages_between", fake_get_messages_between)
-    monkeypatch.setattr(studio_management.text_provider, "generate_newspaper_data", fake_generate_newspaper_data)
+    monkeypatch.setattr(studio_management.studio_editor_pipeline, "get_eligible_conversations", fake_get_eligible_conversations)
+    monkeypatch.setattr(studio_management.studio_editor_pipeline, "summarize_conversations", fake_summarize_conversations)
+    monkeypatch.setattr(studio_management.studio_editor_pipeline, "generate_final_newspaper_json", fake_generate_final_newspaper_json)
     monkeypatch.setattr(studio_management.database, "save_studio_content", fake_save_studio_content)
 
     asyncio.run(cog._generate_and_preview_newspaper(ctx))

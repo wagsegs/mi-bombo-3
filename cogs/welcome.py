@@ -4,6 +4,7 @@ import random
 import discord
 from discord.ext import commands
 
+from utils.gif_api import fetch_gif
 from utils.output_gateway import MessageType, send_output
 
 from config import (
@@ -11,18 +12,19 @@ from config import (
     WELCOME_EMBED_COLOR,
     WELCOME_FOOTER_TEXT,
     WELCOME_GIFS,
+    WELCOME_GIF_QUERIES,
     WELCOME_MESSAGES,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def build_welcome_embed(member, messages=None, gifs=None, color=None, footer_text=None):
+def build_welcome_embed(member, messages=None, gifs=None, color=None, footer_text=None, gif_url=None):
     if not messages or not gifs:
         return None
 
     message = random.choice(messages)
-    gif_url = random.choice(gifs)
+    gif_url = gif_url or random.choice(gifs)
 
     embed = discord.Embed(
         title="🎬 Lights. Camera. Welcome.",
@@ -44,15 +46,7 @@ class WelcomeCog(commands.Cog):
         if getattr(member, "bot", False):
             return
 
-        embed = build_welcome_embed(
-            member,
-            WELCOME_MESSAGES,
-            WELCOME_GIFS,
-            WELCOME_EMBED_COLOR,
-            WELCOME_FOOTER_TEXT,
-        )
-
-        if not embed:
+        if not WELCOME_MESSAGES or not WELCOME_GIFS:
             logger.warning("Welcome embed skipped because the welcome lists are empty.")
             return
 
@@ -67,6 +61,37 @@ class WelcomeCog(commands.Cog):
         if not permissions.send_messages or not permissions.embed_links:
             logger.warning("Missing permissions to send welcome embed in channel %s.", WELCOME_CHANNEL_ID)
             return
+
+        gif_url = None
+
+        if WELCOME_GIF_QUERIES:
+            query = random.choice(WELCOME_GIF_QUERIES)
+            try:
+                gif_url = await fetch_gif(query)
+                if gif_url:
+                    logger.info("Welcome GIF selected from Klipy API using query: %s", query)
+                else:
+                    logger.warning(
+                        "Klipy welcome GIF search returned no results for query %s. Falling back to static welcome GIFs.",
+                        query,
+                    )
+            except Exception as exc:
+                logger.exception(
+                    "Klipy welcome GIF search failed for query %s: %s. Falling back to static welcome GIFs.",
+                    query,
+                    exc,
+                )
+        else:
+            logger.warning("No welcome GIF search queries configured; falling back to static welcome GIFs.")
+
+        embed = build_welcome_embed(
+            member,
+            WELCOME_MESSAGES,
+            WELCOME_GIFS,
+            WELCOME_EMBED_COLOR,
+            WELCOME_FOOTER_TEXT,
+            gif_url=gif_url,
+        )
 
         try:
             allowed_mentions = discord.AllowedMentions(roles=False, everyone=False, users=True)

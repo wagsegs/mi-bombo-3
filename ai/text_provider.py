@@ -101,6 +101,15 @@ Return a JSON object with these exact fields:
 Make it entertaining, dramatic, and themed around a movie studio called 'MI BOMBO Studios'.
 Return ONLY valid JSON, no markdown or extra text."""
 
+    prompt_characters = len(prompt)
+    prompt_tokens_estimate = max(1, int(prompt_characters / 4))
+    logger.info(
+        "Studio Pipeline Debug: Prompt characters=%s, Prompt tokens=%s, Message rows=%s, Messages chars=%s",
+        prompt_characters,
+        prompt_tokens_estimate,
+        len(messages),
+        sum(len(msg['content']) for msg in messages if msg.get('content')),
+    )
     return await generate_text(prompt, conversational=False)
 
 

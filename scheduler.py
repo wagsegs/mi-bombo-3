@@ -17,6 +17,7 @@ from config import (
     NEWSPAPER_CHANNEL_ID,
     WEEKLY_CAST_CHANNEL_ID,
 )
+from utils import studio_editor_pipeline
 from utils.output_gateway import MessageType, send_output
 from utils.timezone import utc_now
 
@@ -108,17 +109,21 @@ async def _job_newspaper() -> None:
     try:
         logger.info("📰 Starting daily newspaper generation...")
 
-        # Get messages from last 24 hours
+        # Get eligible conversations from the last 24 hours
         end_time = utc_now()
         start_time = end_time - timedelta(hours=24)
-        messages = await database.get_messages_between(start_time, end_time)
+        conversations = await studio_editor_pipeline.get_eligible_conversations(start_time, end_time)
 
-        if not messages:
-            logger.warning("No messages found for newspaper")
+        if not conversations:
+            logger.warning("No eligible conversations found for newspaper")
             return
 
-        # Generate newspaper data with the text provider
-        newspaper_json = await text_provider.generate_newspaper_data(messages)
+        conversation_summaries = await studio_editor_pipeline.summarize_conversations(conversations)
+        if not conversation_summaries:
+            logger.warning("No eligible conversation summaries found for newspaper")
+            return
+
+        newspaper_json = await studio_editor_pipeline.generate_final_newspaper_json(conversation_summaries)
 
         if not newspaper_json:
             logger.error("Failed to generate newspaper data")

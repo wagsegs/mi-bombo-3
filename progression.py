@@ -252,36 +252,96 @@ async def check_and_promote(guild: discord.Guild, member: discord.Member) -> Opt
 async def create_casting_update_embed(member: discord.Member, new_role: discord.Role) -> discord.Embed:
     """
     Create a cinematic casting update embed.
-    
+
     Args:
         member: The promoted member
         new_role: Their new role
-    
+
     Returns:
         Discord Embed object
     """
-    messages = [
-        f"🎬 {member.mention} has been cast as **{new_role.name}**!",
-        f"✨ {member.mention} is now **{new_role.name}**!",
-        f"🎭 {member.mention} has ascended to **{new_role.name}**!",
-        f"🏆 {member.mention} earned the role of **{new_role.name}**!",
-        f"⭐ {member.mention} is officially **{new_role.name}** now!",
+    announcement_titles = [
+        "🎬 CASTING UPDATE",
+        "🎥 DIRECTOR'S MEMO",
+        "📰 HOLLYWOOD REPORT",
+        "🎭 AUDITION RESULTS",
+        "🍿 STUDIO GOSSIP",
+        "🎞️ PRODUCTION NOTICE",
+        "📽️ CAST ANNOUNCEMENT",
+        "🎬 CALL SHEET UPDATE",
     ]
 
-    message = random.choice(messages)
+    promotion_templates = [
+        "{member} earned the role of {role}.",
+        "{member} has officially joined the cast as {role}.",
+        "{member} somehow convinced the director to cast them as {role}.",
+        "After countless takes, {member} lands the role of {role}.",
+        "The casting department approved {member} for {role}.",
+        "Against all odds, {member} is now {role}.",
+        "{member}'s contract has been upgraded to {role}.",
+        "Cameras keep finding {member}, who is now {role}.",
+    ]
 
-    # Get user's progression status for a cinematic promotion update.
+    info_titles = [
+        "Production Status",
+        "Director's Notes",
+        "Casting Report",
+        "Studio Evaluation",
+        "Crew Feedback",
+        "Daily Rushes",
+        "Producer Remarks",
+    ]
+
+    info_texts = [
+        "The Director has been noticing you.",
+        "Producers want more scenes with you.",
+        "Your screen time keeps increasing.",
+        "The writers keep putting you in the script.",
+        "Critics are starting to pay attention.",
+        "The audience remembers your performances.",
+        "Cameras seem to follow you everywhere.",
+        "Your contract just got a little bigger.",
+        "The studio expects bigger things from you.",
+        "You're becoming impossible to cut from the final edit.",
+    ]
+
+    role_flavor_text = {
+        "Audience": "The ticket has been purchased. The story begins.",
+        "Extra": "Every legend starts in the background.",
+        "Guest Star": "You're finally getting your own scenes.",
+        "Supporting Cast": "The audience knows your name now.",
+        "Main Cast": "You're officially one of the faces of the production.",
+        "Main Character": "The script seems to revolve around you.",
+        "Fan Favorite": "The audience refuses to stop talking about you.",
+        "Scene Stealer": "Somehow every scene becomes yours.",
+        "Box Office Legend": "Your name alone fills theaters.",
+        "Hall of Fame": "Your performances are now part of MI BOMBO Studios history.",
+    }
+
+    title = random.choice(announcement_titles)
+    promotion_text = random.choice(promotion_templates).format(
+        member=member.mention,
+        role=f"**{new_role.name}**",
+    )
+    section_title = random.choice(info_titles)
+    section_text = random.choice(info_texts)
+    flavor_text = role_flavor_text.get(new_role.name, "Your presence is making the production bigger.")
+
     user = await database.get_user(member.id)
     screen_time = user['screen_time'] if user else 0
     status = get_promotion_status(screen_time, None)
 
     embed = discord.Embed(
-        title="🎬 CASTING UPDATE",
-        description=message,
+        title=title,
+        description=f"{promotion_text}\n\n{section_text}",
         color=new_role.color if new_role.color != discord.Color.default() else discord.Color(0x7B61FF),
+        timestamp=discord.utils.utcnow(),
     )
     embed.add_field(name="Production Status", value=status, inline=False)
-    embed.add_field(name="Role", value=new_role.mention, inline=True)
+    embed.add_field(name=f"🎬 {section_title}", value=status, inline=False)
+    embed.add_field(name="⭐ Promoted Role", value=new_role.mention, inline=True)
+    embed.add_field(name="📌 Studio Brief", value=flavor_text, inline=True)
+    embed.add_field(name="🎭 Casting Notes", value=section_text, inline=False)
     embed.set_thumbnail(url=member.display_avatar.url)
     embed.set_footer(text="MI BOMBO Studios | Director's Cast")
 

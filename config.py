@@ -38,6 +38,16 @@ WELCOME_MESSAGES = _load_asset_lines("welcome_messages.txt") or [
 WELCOME_GIFS = _load_asset_lines("welcome_gifs.txt") or [
     "https://media.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif",
 ]
+WELCOME_GIF_QUERIES = _load_asset_lines("welcome_gif_queries.txt") or [
+    "welcome",
+    "celebration",
+    "red carpet",
+    "movie entrance",
+    "applause",
+    "anime entrance",
+    "crowd cheering",
+    "director action",
+]
 
 DIRECTORS_TITLE = os.getenv("DIRECTORS_TITLE", "🎬 DIRECTOR'S NOTES")
 DIRECTORS_DESCRIPTION = os.getenv(
@@ -124,6 +134,12 @@ POLLINATIONS_BASE_URL = os.getenv("POLLINATIONS_BASE_URL")
 POLLINATIONS_IMAGE_BASE_URL = os.getenv("POLLINATIONS_IMAGE_BASE_URL")
 POLLINATIONS_TEXT_BASE_URL = os.getenv("POLLINATIONS_TEXT_BASE_URL")
 AI_CHAT_ENABLED = os.getenv("AI_CHAT_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+
+# Studio Editor Pipeline configuration
+NEWS_CONVERSATION_LIMIT = int(os.getenv("NEWS_CONVERSATION_LIMIT", "50"))
+MAX_PROMPT_CHARS = int(os.getenv("MAX_PROMPT_CHARS", "12000"))
+TARGET_INPUT_TOKENS = int(os.getenv("TARGET_INPUT_TOKENS", "2000"))
+CHUNK_SIZE_MESSAGES = int(os.getenv("CHUNK_SIZE_MESSAGES", "25"))
 
 # ============================================================
 # SERVER & CHANNELS
