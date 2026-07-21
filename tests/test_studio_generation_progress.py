@@ -90,3 +90,27 @@ def test_newspaper_generation_updates_the_same_progress_message(monkeypatch):
     assert len(progress_message.edits) >= 2
     final_embed = progress_message.edits[-1]["embed"]
     assert final_embed.title.startswith("📰")
+
+
+def test_no_eligible_conversations_uses_natural_preview(monkeypatch):
+    cog = studio_management.StudioManagementCog(SimpleNamespace(get_channel=lambda _id: None))
+    ctx = DummyContext(author_id=1, owner_id=1)
+    progress_message = FakeMessage()
+
+    async def fake_send_output(destination, **kwargs):
+        if kwargs.get("embed") is not None:
+            return progress_message
+        return None
+
+    async def fake_get_eligible_conversations(*args, **kwargs):
+        return []
+
+    monkeypatch.setattr(studio_management, "send_output", fake_send_output)
+    monkeypatch.setattr(studio_management.studio_editor_pipeline, "get_eligible_conversations", fake_get_eligible_conversations)
+
+    asyncio.run(cog._generate_and_preview_newspaper(ctx))
+
+    assert len(progress_message.edits) >= 1
+    final_embed = progress_message.edits[-1]["embed"]
+    assert final_embed.title == "📰 No Headlines Worth Printing Today"
+    assert "nothing to report" in final_embed.description.lower()

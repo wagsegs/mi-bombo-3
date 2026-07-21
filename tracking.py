@@ -8,6 +8,10 @@ from config import (
     LORE_MIN_MESSAGES,
     LORE_MAX_AVERAGE_REPLY_GAP_SECONDS,
     LORE_MIN_DURATION_SECONDS,
+    LORE_FLEXIBLE_MESSAGE_COUNT,
+    LORE_FLEXIBLE_MIN_PARTICIPANTS,
+    LORE_FLEXIBLE_MIN_DURATION_SECONDS,
+    LORE_FLEXIBLE_MAX_AVERAGE_REPLY_GAP_SECONDS,
 )
 from utils.timezone import ensure_utc_datetime, utc_now
 
@@ -23,14 +27,26 @@ def get_lore_eligibility_reasons(
     """Return the reasons a conversation should not be considered for lore."""
     reasons: List[str] = []
     if message_count < LORE_MIN_MESSAGES:
-        reasons.append("Not enough messages")
+        reasons.append(f"Needs at least {LORE_MIN_MESSAGES} messages")
     if participant_count < LORE_MIN_PARTICIPANTS:
-        reasons.append("Not enough participants")
+        reasons.append(f"Needs at least {LORE_MIN_PARTICIPANTS} participants")
     if average_gap_seconds > LORE_MAX_AVERAGE_REPLY_GAP_SECONDS:
-        reasons.append("Conversation too scattered")
+        reasons.append(
+            f"Replies are too spread out (max gap {LORE_MAX_AVERAGE_REPLY_GAP_SECONDS}s)"
+        )
     if duration_seconds < LORE_MIN_DURATION_SECONDS:
-        reasons.append("Conversation too short")
+        reasons.append(f"Needs at least {LORE_MIN_DURATION_SECONDS}s of activity")
     return reasons
+
+
+def get_lore_eligibility_rule_summary() -> str:
+    """Return a human-readable summary of the current configurable eligibility rules."""
+    return (
+        f"Configured rule: {LORE_MIN_MESSAGES}+ messages, {LORE_MIN_PARTICIPANTS}+ participants, "
+        f"{LORE_MIN_DURATION_SECONDS}s minimum activity, and {LORE_MAX_AVERAGE_REPLY_GAP_SECONDS}s max average reply gap. "
+        f"Highly active chats may still qualify with {LORE_FLEXIBLE_MESSAGE_COUNT}+ messages and "
+        f"{LORE_FLEXIBLE_MIN_DURATION_SECONDS}s activity."
+    )
 
 
 def evaluate_lore_eligibility(
@@ -40,13 +56,29 @@ def evaluate_lore_eligibility(
     average_gap_seconds: float,
 ) -> tuple[bool, List[str]]:
     """Return whether a conversation is eligible for lore generation and the reasons if not."""
+    if (
+        message_count >= LORE_MIN_MESSAGES
+        and participant_count >= LORE_MIN_PARTICIPANTS
+        and duration_seconds >= LORE_MIN_DURATION_SECONDS
+        and average_gap_seconds <= LORE_MAX_AVERAGE_REPLY_GAP_SECONDS
+    ):
+        return True, []
+
+    if (
+        message_count >= LORE_FLEXIBLE_MESSAGE_COUNT
+        and participant_count >= LORE_FLEXIBLE_MIN_PARTICIPANTS
+        and duration_seconds >= LORE_FLEXIBLE_MIN_DURATION_SECONDS
+        and average_gap_seconds <= LORE_FLEXIBLE_MAX_AVERAGE_REPLY_GAP_SECONDS
+    ):
+        return True, []
+
     reasons = get_lore_eligibility_reasons(
         message_count=message_count,
         participant_count=participant_count,
         duration_seconds=duration_seconds,
         average_gap_seconds=average_gap_seconds,
     )
-    return len(reasons) == 0, reasons
+    return False, reasons
 
 
 class ConversationTracker:

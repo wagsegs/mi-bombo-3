@@ -75,6 +75,20 @@ class StudioGenerationTask:
         embed.set_footer(text=self.footer)
         return await self.complete(embed)
 
+    async def complete_naturally(self, title: str, description: str):
+        embed = discord.Embed(
+            title=title,
+            description=description,
+            color=discord.Color(0x7B61FF),
+        )
+        embed.add_field(
+            name="Status",
+            value="The studio has nothing new to report from the current footage.",
+            inline=False,
+        )
+        embed.set_footer(text=self.footer)
+        return await self.complete(embed)
+
     async def _refresh(self):
         if self.message is None:
             return None
@@ -330,20 +344,44 @@ class StudioManagementCog(commands.Cog):
             await progress_task.update_stage("Collecting eligible conversations...")
             recent_conversations = await database.get_recent_conversation_summaries(limit=10)
             if not recent_conversations:
-                await progress_task.fail("No eligible conversations found for lore generation.")
+                await progress_task.complete_naturally(
+                    "🎬 No Lore Worth Filming Today",
+                    "Nothing to report from today's footage. The Director reviewed the scene but couldn't find any conversations worthy of becoming studio canon.\n\nKeep the cameras rolling—tomorrow's chaos might become legend.",
+                )
                 return
-            
+
             eligible_messages = []
             for conv in recent_conversations:
                 started_at = conv.get('started_at')
                 ended_at = conv.get('ended_at')
-                if started_at and ended_at:
-                    messages = await database.get_messages_between(started_at, ended_at)
-                    if messages:
-                        eligible_messages.extend(messages)
-            
+                if not started_at or not ended_at:
+                    continue
+
+                message_count = len(conv.get('message_ids') or [])
+                participant_count = len(conv.get('participant_ids') or [])
+                duration_seconds = max(0, int((ended_at - started_at).total_seconds()))
+                messages = await database.get_messages_between(started_at, ended_at)
+                timestamps = [msg.get('created_at') for msg in messages if msg.get('created_at')]
+                timestamps.sort()
+                average_gap_seconds = 0.0
+                if len(timestamps) > 1:
+                    gaps = [(timestamps[idx] - timestamps[idx - 1]).total_seconds() for idx in range(1, len(timestamps))]
+                    average_gap_seconds = sum(gaps) / len(gaps) if gaps else 0.0
+
+                is_eligible, _ = tracking.evaluate_lore_eligibility(
+                    message_count=message_count,
+                    participant_count=participant_count,
+                    duration_seconds=duration_seconds,
+                    average_gap_seconds=average_gap_seconds,
+                )
+                if is_eligible and messages:
+                    eligible_messages.extend(messages)
+
             if not eligible_messages:
-                await progress_task.fail("No messages found in eligible conversations.")
+                await progress_task.complete_naturally(
+                    "🎬 No Lore Worth Filming Today",
+                    "Nothing to report from today's footage. The Director reviewed the scene but couldn't find any conversations worthy of becoming studio canon.\n\nKeep the cameras rolling—tomorrow's chaos might become legend.",
+                )
                 return
 
             await progress_task.update_stage("Writing lore episode...")
@@ -482,6 +520,7 @@ class StudioManagementCog(commands.Cog):
             ]
             if not is_eligible:
                 lines.append("Reason:")
+                lines.append(f"• {tracking.get_lore_eligibility_rule_summary()}")
                 lines.extend(f"• {reason}" for reason in reasons)
             embed.add_field(name="\u200b", value="\n".join(lines), inline=False)
 
@@ -668,7 +707,10 @@ class StudioManagementCog(commands.Cog):
             await progress_task.update_stage("Collecting conversation footage...")
             conversations = await studio_editor_pipeline.get_eligible_conversations(start_time, end_time)
             if not conversations:
-                await progress_task.fail("No eligible conversations were found for a newspaper preview.")
+                await progress_task.complete_naturally(
+                    "📰 No Headlines Worth Printing Today",
+                    "Nothing to report from today's footage. The newsroom couldn't find enough meaningful studio drama to print a preview.\n\nThe editors are still watching the set—tomorrow may bring a better headline.",
+                )
                 return
 
             await progress_task.update_stage("Reviewing today's events...")
@@ -727,13 +769,29 @@ class StudioManagementCog(commands.Cog):
         image_path = None
         try:
             await progress_task.update_stage("Collecting conversation footage...")
-            messages = await database.get_messages_between(start_time, end_time)
-            if not messages:
-                await progress_task.fail("No recent messages were found for a weekly cast preview.")
+            conversations = await studio_editor_pipeline.get_eligible_conversations(start_time, end_time)
+            if not conversations:
+                await progress_task.complete_naturally(
+                    "🎭 No Cast Worth Spotlighting This Week",
+                    "Nothing to report from this week's footage. The studio couldn't find enough memorable interaction to justify a weekly cast preview.\n\nKeep the spotlight warm—tomorrow's chaos might earn a starring role.",
+                )
+                return
+
+            eligible_messages = []
+            for conversation in conversations:
+                messages = conversation.get("messages") or []
+                if messages:
+                    eligible_messages.extend(messages)
+
+            if not eligible_messages:
+                await progress_task.complete_naturally(
+                    "🎭 No Cast Worth Spotlighting This Week",
+                    "Nothing to report from this week's footage. The studio couldn't find enough memorable interaction to justify a weekly cast preview.\n\nKeep the spotlight warm—tomorrow's chaos might earn a starring role.",
+                )
                 return
 
             await progress_task.update_stage("Reviewing this week's highlights...")
-            cast_json = await text_provider.generate_weekly_cast_data(messages)
+            cast_json = await text_provider.generate_weekly_cast_data(eligible_messages)
             if not cast_json:
                 await progress_task.fail("The studio could not generate a weekly cast preview right now.")
                 return
