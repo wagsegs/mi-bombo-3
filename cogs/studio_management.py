@@ -325,7 +325,6 @@ class StudioManagementCog(commands.Cog):
             footer="MI BOMBO Studios | Lore Preview",
         )
         await progress_task.start()
-        image_path = None
         try:
             await progress_task.update_stage("Collecting eligible conversations...")
             recent_conversations = await database.get_recent_conversation_summaries(limit=10)
@@ -372,6 +371,7 @@ class StudioManagementCog(commands.Cog):
             image_prompt = data.get("image_prompt")
             if image_prompt:
                 image_path = await image_provider.generate_image(image_prompt)
+                data["image_path"] = image_path
             
             embed = self._build_lore_embed(data, image_path)
 
@@ -380,9 +380,6 @@ class StudioManagementCog(commands.Cog):
         except Exception as exc:
             logger.exception("Failed to generate lore preview")
             await progress_task.fail(str(exc) or "Unexpected error")
-        finally:
-            if image_path:
-                image_provider.cleanup_temp_file(image_path)
 
     def _build_lore_embed(self, data: dict, image_path: Optional[str] = None) -> discord.Embed:
         embed = discord.Embed(
